@@ -12,7 +12,9 @@ _deps
 CMakeUserPresets.json
 .vs/
 Folder.DotSettings.user
-
+out/
+out/build/
+out/build/x64-debug
 # CLion
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
 #  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore

@@ -4,12 +4,20 @@
 
 #include <iostream>
 #include <string>
+#include <fstream>
 
 NES_CPU* nes_cpu;
 
-// $0000 - $00ff zero page
-// $0100 - $01ff stack 
-// Need $fffa – $ffff.These addresses contain the addresses of the reset routine and the IRQ and NMI ISR(interrupt service routine).
+/// <summary>
+/// Check if given address is, not strictly, within bounds
+/// </summary>
+/// <param name="address"> address to check</param>
+/// <param name="addressLowerBound"> lower bound, inclusive</param>
+/// <param name="addressUpperBound"> upper bound, inclusive</param>
+/// <returns> True if in bounds, false if not</returns>
+bool isAddressInRangeInclusive(Word address, Word addressLowerBound, Word addressUpperBound) {
+	return address >= addressLowerBound &&  address <= addressUpperBound;
+}
 
 void NES_CPU::power_up() {
 	A = 0;
@@ -42,7 +50,7 @@ void NES_CPU::run() {
 	while (true) {
 		if (cycleCount <= 0) {
 			
-			Byte opcode = memory[PC];
+			Byte opcode = correctPeek(PC);
 			Word address = PC;
 			
 			// BREAK OPCODE
@@ -69,64 +77,122 @@ bool NES_CPU::setBytes(int start, std::vector<int> source) {
 	return true;
 }
 
-//void NES_CPU::printRegisters() {
-//	std::cout << "A: " << A << "\n";
-//	std::cout << "P: " << P << "\n";
-//	std::cout << "X: " << X << "\n";
-//	std::cout << "Y: " << Y << "\n";
-//	std::cout << "S: " << S << "\n";
-//	std::cout << "PC: " << PC << "\n";
-//}
+bool NES_CPU::loadROM(std::string path) {
+	// Open the file in binary mode and move cursor to the end to get size
+	std::ifstream file(path, std::ios::binary | std::ios::ate);
+
+	if (!file) {
+		std::cerr << "Failed to open file: " << path << "\n";
+		return false;
+	}
+
+	// Get size and allocate buffer
+	std::streamsize size = file.tellg();
+	file.seekg(0, std::ios::beg);
+
+	std::vector<char> buffer(size);
+
+	if (file.read(buffer.data(), size)) {
+
+		// Check if prg rom is 16kb or 32 kb
+		if (buffer[4] == 1) nes_cpu->isPRG_ROMMirrored = true; // PRG ROM is 16kb
+		else nes_cpu->isPRG_ROMMirrored = false; // PRG ROM is 32 kb
+
+		// Load 16 KB after first 16 bytes
+		for (int i = 0; i < 0x4000; i++) {
+			nes_cpu->memory[0X8000 + i] = buffer[16 + i];
+		}
+
+	}
+	else {
+		std::cerr << "Error reading file.\n";
+		return false;
+	}
+
+	return true;
+}
+
 
 
 Byte NES_CPU::peek(Word address) {
 	return memory[address];
 }
 
+Byte NES_CPU::correctPeek(Word address) {
+	// 0x0000 0x07FF is where ram is (2KB)
+	// Since ram is mirrored 3 times between 0x0800 and 0x1FFF, address % $0800 will
+	// Lead to data that would have been mirrored. Saves actually copying the data
+	// Into the "mirrored" sections
+	if (isAddressInRangeInclusive(address, 0x0000, 0x1FFF)) {
+		this->openBusValue = memory[address % 0x0800];
+		return memory[address % 0x0800];
+	}
+
+	// 0x2000 - 0x2007 is where PPU registers are
+	// Mirrored every 8 bytes between 0x2008 - 0x3ff
+	if (isAddressInRangeInclusive(address, 0x2000, 0x3FFF)) {
+		this->openBusValue = memory[address % 8 + 0x2000];
+		return memory[address % 8 + 0x2000];
+	}
+
+	// 0x8000 - 0XFFFF is where PRG ROM is
+	// If program is 16kb, 0x8000 - 0XBFFF is mirrored into
+	// 0xC000 - FFFF. If prg rom is mirroed and address is between
+	// 0xC000 - 0xFFFF, read from 0x8000 - 0xBFFF to simulate mirrored
+	// memory
+	if (isPRG_ROMMirrored && isAddressInRangeInclusive(address, 0xC000, 0XFFFF)) {
+		this->openBusValue = memory [ address % 0x4000 + 0x8000];
+		return memory[address % 0x4000 + 0x8000];
+	}
+
+	this->openBusValue = memory[address];
+	return memory[address];
+}
+
 Byte NES_CPU::immediatePeek(Word address) {
-	return memory[address + 1];
+	return correctPeek(address + 1);
 }
 
 Byte NES_CPU::zeroPagePeek(Word address) {
-	Word zeropageaddress = memory[address + 1];
-	return memory[zeropageaddress];
+	Word zeropageaddress = correctPeek(address + 1);
+	return correctPeek(zeropageaddress);
 }
 
 Byte NES_CPU::zeroPageXPeek(Word address) {
-	Word zeropageXaddress = memory[address + 1] + X;
-	return memory[zeropageXaddress];
+	Word zeropageXaddress = correctPeek(address + 1) + X;
+	return correctPeek(zeropageXaddress);
 }
 
 Byte NES_CPU::zeroPageYPeek(Word address) {
-	Word zeropageYaddress = memory[address + 1] + Y;
-	return memory[zeropageYaddress];
+	Word zeropageYaddress = correctPeek(address + 1) + Y;
+	return correctPeek(zeropageYaddress);
 }
 
 Byte NES_CPU::absolutePeek(Word address) {
-	Word absoluteaddress = memory[address + 1] + (memory[address + 2] << 8);
-	return memory[absoluteaddress];
+	Word absoluteaddress = correctPeek(address + 1) + (correctPeek(address + 2) << 8);
+	return correctPeek(absoluteaddress);
 }
 
 Byte NES_CPU::absoluteXPeek(Word address) {
-	Word absoluteXaddress = X + memory[address + 1] + (memory[address + 2] << 8);
-	return memory[absoluteXaddress];
+	Word absoluteXaddress = X + correctPeek(address + 1) + (correctPeek(address + 2) << 8);
+	return correctPeek(absoluteXaddress);
 }
 
 Byte NES_CPU::absoluteYPeek(Word address) {
-	Word absoluteYaddress = Y + memory[address + 1] + (memory[address + 2] << 8);
-	return memory[absoluteYaddress];
+	Word absoluteYaddress = Y + correctPeek(address + 1) + (correctPeek(address + 2) << 8);
+	return correctPeek(absoluteYaddress);
 }
 
 Byte NES_CPU::indirectXPeek(Word address) {
-	Word indirectXPeek = memory[address + 1] + X;
-	Word lookupaddress = memory[indirectXPeek] + (memory[indirectXPeek + 1] << 8);
-	return memory[lookupaddress];
+	Word indirectXPeek = correctPeek(address + 1) + X;
+	Word lookupaddress = correctPeek(indirectXPeek) + (correctPeek(indirectXPeek + 1) << 8);
+	return correctPeek(lookupaddress);
 }
 
 Byte NES_CPU::indirectYPeek(Word address) {
-	Word indirectYPeek = memory[address + 1];
-	Word lookupaddress = Y + memory[indirectYPeek] + (memory[indirectYPeek + 1] << 8);
-	return memory[lookupaddress];
+	Word indirectYPeek = correctPeek(address + 1);
+	Word lookupaddress = Y + correctPeek(indirectYPeek) + (correctPeek(indirectYPeek + 1) << 8);
+	return correctPeek(lookupaddress);
 }
 
 void NES_CPU::zeroPageSet(Word address, Byte data) {

@@ -76,12 +76,38 @@ static std::string charToHex(Byte chr) {
 
 void NES_CPUdebug::printMemory(int start, int end) {
 	for (int pageNum = start; pageNum <= end; pageNum++) {
-		for (int i = 256 * pageNum; i < 256 * (pageNum + 1); i++) {
-			if (i % 16 == 0) std::cout << "\n";
+		for (int address = 256 * pageNum; address < 256 * (pageNum + 1); address++) {
+			if (address % 16 == 0) std::cout << "\n";
 
-			// Minus 1 from i since nes_cpu->immediatePeek() increments input by 1
-			std::cout << charToHex(nes_cpu->immediatePeek(i - 1)) << " ";
+			std::cout << charToHex(nes_cpu->peek(address)) << " ";
 		}
 		std::cout << "\n";
 	}
 }
+
+void NES_CPUdebug::printMemoryMirrored(int start, int end) {
+	if (start < 0 || start >= 256) {
+		std::cerr << "start page not in range 0-255\n";
+		return;
+	}
+
+	if (end < 0 || end >= 256) {
+		std::cerr << "end page not in range 0-255\n";
+		return;
+	}
+
+	if (end < start) {
+		std::cerr << "end page less than start page\n";
+		return;
+	}
+
+	for (int pageNum = start; pageNum <= end; pageNum++) {
+		for (int address = 256 * pageNum; address < 256 * (pageNum + 1); address++) {
+			if (address % 16 == 0) std::cout << "\n";
+			
+			std::cout << charToHex(nes_cpu->correctPeek(address)) << " ";
+		}
+		std::cout << "\n";
+	}
+}
+

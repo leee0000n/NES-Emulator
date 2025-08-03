@@ -3,6 +3,7 @@
 
 #include <array>
 #include <vector>
+#include <string>
 
 typedef unsigned char Byte;
 typedef unsigned short Word;
@@ -33,6 +34,12 @@ NV1B DIZC
 +--------- Negative
 */
 
+/*
+ * TODO:
+ * Implement mirroring of RAM
+ * Implement unmapped regions of memory returning last value read from memory
+ */
+
 /// <summary>
 /// CPU for the nes
 /// </summary>
@@ -49,7 +56,13 @@ private:
 	// from bit 7 to bit 0 these are the negative(N), overflow(V), reserved, break (B), decimal(D), interrupt disable(I), zero(Z) and carry(C) flag
 	Byte P; // Status flags
 
-	Word PC; // Program counter 
+	Word PC; // Program counter
+
+	// Last value read from memory. Returned when reading from unmapped
+	// regions of memory.
+	Byte openBusValue;
+
+	bool isPRG_ROMMirrored;
 
 	std::array<Byte, 65536> memory;
 public:
@@ -76,10 +89,7 @@ public:
 	/// <returns></returns>
 	bool setBytes(int start, std::vector<int> source);
 
-	/// <summary>
-	/// Print value stored in all registers
-	/// </summary>
-	//void printRegisters();
+	bool loadROM(std::string path);
 
 	/// <summary>
 	/// Peek at data stored at specific address
@@ -87,6 +97,14 @@ public:
 	/// <param name="address"> address of data</param>
 	/// <returns> Data at specified address</returns>
 	Byte peek(Word address);
+
+	/// <summary>
+	/// Peek at data stored at specific address into account
+	/// mirrored sections of memory
+	/// </summary>
+	/// <param name="address"> address to read</param>
+	/// <returns> memory stored at that location</returns>
+	Byte correctPeek(Word address);
 
 	/// <summary>
 	/// Get the operand of the opcode
