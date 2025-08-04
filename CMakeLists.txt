@@ -9,6 +9,11 @@ if (POLICY CMP0141)
   set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<IF:$<AND:$<C_COMPILER_ID:MSVC>,$<CXX_COMPILER_ID:MSVC>>,$<$<CONFIG:Debug,RelWithDebInfo>:EditAndContinue>,$<$<CONFIG:Debug,RelWithDebInfo>:ProgramDatabase>>")
 endif()
 
+# Define DEBUG if in debug mode
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_compile_definitions(DEBUG)
+endif()
+
 project ("NES_Emulator")
 
 set( SOURCE_PATH "${PROJECT_SOURCE_DIR}/src" )
@@ -16,6 +21,8 @@ set( INCLUDE_PATH "${PROJECT_SOURCE_DIR}/include" )
 
 file( GLOB_RECURSE INCLUDES "${INCLUDE_PATH}/*.h" )
 file( GLOB_RECURSE CPPS "${SOURCE_PATH}/*.cpp" )
+
+file( GLOB ASSETS "${PROJECT_SOURCE_DIR}/resource/*.*")
 
 # Add source to this project's executable.
 add_executable (${PROJECT_NAME} ${CPPS} ${INCLUDES})

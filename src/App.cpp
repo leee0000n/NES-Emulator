@@ -35,5 +35,7 @@ void App::run() {
 
 
 	// print pages
-	NES_CPUdebug::printMemoryMirrored(0x0000 / 256, 0x0000 / 256);
+	NES_CPUdebug::printMemoryMirrored(0x0000, 0x0000);
+
+	NES_CPUdebug::addCPUTraceToFile("C:/Users/leon_/source/repos/NES-Emulator/resource/cpuTrace.txt");
 }

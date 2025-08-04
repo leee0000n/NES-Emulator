@@ -5,6 +5,8 @@
 #include <vector>
 #include <string>
 
+
+
 typedef unsigned char Byte;
 typedef unsigned short Word;
 
@@ -16,6 +18,7 @@ constexpr int ZERO = 2;
 constexpr int INTERRUPT_DISABLE = 4;
 constexpr int DECIMAL = 8;
 constexpr int BREAK = 16;
+constexpr int NONSENSE_FLAG = 32;
 constexpr int OVRFLOW = 64;
 constexpr int NEGATIVE = 128;
 
@@ -47,6 +50,7 @@ class NES_CPU {
 private:
 	// Number of cycles current instruction takes
 	int cycleCount;
+	unsigned long totalCycleCount;
 
 	Byte A; // Accumulator
 	Byte X; // X index register
@@ -66,6 +70,8 @@ private:
 
 	std::array<Byte, 65536> memory;
 public:
+	NES_CPU();
+
 	/// <summary>
 	/// Power up cpu by setting necessary values
 	/// </summary>
@@ -130,10 +136,14 @@ public:
 
 	Byte absoluteYPeek(Word address);
 
+	Byte indirectPeek(Word address);
+
 	Byte indirectXPeek(Word address);
 
 	Byte indirectYPeek(Word address);
 
+
+	void correctSet(Word address, Byte data);
 
 	void zeroPageSet(Word address, Byte data);
 
@@ -150,8 +160,6 @@ public:
 	void indirectXSet(Word address, Byte data);
 
 	void indirectYSet(Word address, Byte data);
-
-
 
 	/// <summary>
 	/// Set data at address
@@ -170,6 +178,7 @@ public:
 	Byte getP() const;
 
 	Word getPC() const;
+	unsigned long getTotalCycleCount() const;
 
 	void setA(Byte A);
 	void setX(Byte X);
@@ -180,9 +189,19 @@ public:
 	void setPC(Word PC);
 	void incrementPCBy(Word increment);
 
-	void pushStack(Byte data);
+	/// <summary>
+	/// Used for push 1 byte of data
+	/// </summary>
+	void pushStack1Byte(Byte data);
 
-	Byte pullStack();
+	/// <summary>
+	/// Used for pushing 2 bytes of data
+	/// </summary>
+	void pushStack2Byte(Word data);
+
+	Byte pullStack1Byte();
+
+	Word pullStack2Byte();
 
 	void setCarry();
 	void clearCarry();

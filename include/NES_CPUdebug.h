@@ -3,6 +3,8 @@
 #include "NES_CPU.h"
 
 class NES_CPUdebug {
+private:
+	static std::string cpuTrace;
 public:
 	/// <summary>
 	/// Print all pages between start and end pag, inclusive. Does not
@@ -20,7 +22,23 @@ public:
 	/// <param name="end"> end page</param>
 	static void printMemoryMirrored(int start, int end);
 
+	/// <summary>
+	/// Print all register values
+	/// </summary>
 	static void printRegisters();
+
+	/// <summary>
+	/// Logs the state of the CPU register's in a private string attriute
+	/// </summary>
+	static void logCPUState();
+
+	/// <summary>
+	/// Add all logged CPU states stored in private string attribute to specifed file
+	/// </summary>	
+	/// <param name="path"> path to store CPU trace</param>
+	static void addCPUTraceToFile(std::string path);
+
+
 	static void readData();
 	static void addInstruction(Byte opcode, Word address, Word data = 0);
 	static void addProgram(Byte bytes[], int length);

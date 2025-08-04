@@ -1,5 +1,5 @@
 // ReSharper disable CppInconsistentNaming
-#include "Decode.h"
+#include "Opcodes.h"
 
 // Function pointer array
 void (*decode::opcodeFuncPointers[256])(Byte, Word);
@@ -69,17 +69,15 @@ void ADC(Byte opcode, Word address) {
 	// Result of add
 	int result = nes_cpu->getA() + data + (nes_cpu->getP() & 1);
 
-	// Set zero flag to 0
 	nes_cpu->clearZero();
+	nes_cpu->clearCarry();
+	nes_cpu->clearOverflow();
+	nes_cpu->clearNegative();
 
-	// If there is an overflow, set carry bit
-	if (result > 0xFF) { nes_cpu->setCarry(); }
-	// If result is zero, set zero bit
-	else if (result == 0) { nes_cpu->setZero(); }
-	// If result's sign is different from A's and memory's , signed overflow occured
-	if ((result ^ nes_cpu->getA()) & (result ^ data) & 0x80) { nes_cpu->setOverflow(); }
-	// Directly copy MSB into N flag
-	nes_cpu->setP((nes_cpu->getP() & 0x7f) | (result & NEGATIVE));
+	if (result > 0xFF) nes_cpu->setCarry();
+	if (result % 256 == 0) nes_cpu->setZero();
+	if ((result ^ nes_cpu->getA()) & (result ^ data) & 0x80) nes_cpu->setOverflow();
+	if (result & 128) nes_cpu->setNegative();
 
 	nes_cpu->setA(result);
 }
@@ -148,15 +146,14 @@ void AND(Byte opcode, Word address) {
 
 	int result = nes_cpu->getA() & data;
 
-	// Set zero flag to 0
+	
 	nes_cpu->clearZero();
+	nes_cpu->clearNegative();
 
-	// If result is zero, set zero bit
-	if (result == 0) { nes_cpu->setZero(); }
-	// Directly copy MSB into N flag
-	nes_cpu->setP((nes_cpu->getP() & 0x7f) | (result & NEGATIVE));
+	if (result == 0) nes_cpu->setZero();
+	if (result & 128) nes_cpu->setNegative();
 
-	nes_cpu->setA(data);
+	nes_cpu->setA(result);
 }
 
 /// <summary>
@@ -171,72 +168,86 @@ void ASL(Byte opcode, Word address) {
 	switch (opcode) {
 	// Accumulator 1 byte 2 cycles
 	case 0x0a:
-		// Carry flag if ASL with MSB set to 1
-		if (nes_cpu->getA() & 0x80) nes_cpu->setCarry();
-		nes_cpu->setA(nes_cpu->getA() << 1);
-		nes_cpu->setCycleCount(1);
+		data = nes_cpu->getA();
+
+		nes_cpu->clearCarry();
+
+		if (data & 128) {
+			nes_cpu->setCarry();
+		}
+
+		data <<= 1;
+
+		nes_cpu->clearZero();
+		nes_cpu->clearNegative();
+
+		if (data == 0) nes_cpu->setZero();
+		if (data & 128) nes_cpu->setNegative();
+
+		nes_cpu->setA(data);
 		nes_cpu->incrementPCBy(1);
+		nes_cpu->setCycleCount(2);
+
 		return; // Return as function completed
 	// Zero page, 2 bytes, 3 cycles
 	case 0x06:
 		data = nes_cpu->zeroPagePeek(address);
-		nes_cpu->setCycleCount(2);
+		nes_cpu->setCycleCount(5);
 		nes_cpu->incrementPCBy(2);
 		break;
 	// Zero page,X , 2 bytes, 4 cycles
 	case 0x16:
 		data = nes_cpu->zeroPageXPeek(address);
-		nes_cpu->setCycleCount(2);
+		nes_cpu->setCycleCount(6);
 		nes_cpu->incrementPCBy(2);
 		break;
 	// Absolute, 3 bytes, 4 cycles
 	case 0x0e:
 		data = nes_cpu->absolutePeek(address);
-		nes_cpu->setCycleCount(3);
+		nes_cpu->setCycleCount(6);
 		nes_cpu->incrementPCBy(3);
 		break;
 	// Absolute,X , 3 bytes, 4 cycles (5 if page crossed)
 	case 0x1e:
 		data = nes_cpu->absoluteXPeek(address);
-		nes_cpu->setCycleCount(3);
+		nes_cpu->setCycleCount(7);
 		nes_cpu->incrementPCBy(3);
 		break;
 	default:
 		break;
 	}
 
-	// Shift bit 7 into carry flag
-	nes_cpu->setP((nes_cpu->getP() & 0xfe) | (data & NEGATIVE));
+	nes_cpu->clearCarry();
 
-	int result = data << 1;
+	if (data & 128) {
+		nes_cpu->setCarry();
+	}
 
-	// Set zero flag to 0
+	data <<= 1;
+
 	nes_cpu->clearZero();
+	nes_cpu->clearNegative();
 
-	// If there is an overflow, set carry bit
-	if (result > 0xFF) { nes_cpu->setCarry(); }
-	// If result is zero, set zero bit
-	else if (result == 0) { nes_cpu->setZero(); }
-	// Directly copy MSB into N flag
-	nes_cpu->setP((nes_cpu->getP() & 0x7f) | (result & NEGATIVE));
+	if (data == 0) nes_cpu->setZero();
+	if (data & 128) nes_cpu->setNegative();
 
 	// Set memory to new value
 	switch (opcode) {
 	// Zero page, 2 bytes, 3 cycles
 	case 0x06:
-		nes_cpu->zeroPageSet(address, result);
+		nes_cpu->zeroPageSet(address, data);
 		break;
 	// Zero page,X , 2 bytes, 4 cycles
 	case 0x16:
-		nes_cpu->zeroPageXSet(address, result);
+		nes_cpu->zeroPageXSet(address, data);
 		break;
 	// Absolute, 3 bytes, 4 cycles
 	case 0x0e:
-		nes_cpu->absoluteSet(address, result);
+		nes_cpu->absoluteSet(address, data);
 		break;
 	// Absolute,X , 3 bytes, 4 cycles (5 if page crossed)
 	case 0x1e:
-		nes_cpu->absoluteXSet(address, result);
+		nes_cpu->absoluteXSet(address, data);
 		break;
 	default:
 		break;
@@ -321,14 +332,13 @@ void BIT(Byte opcode, Word address) {
 
 	// Set zero flag to 0
 	nes_cpu->clearZero();
+	nes_cpu->clearOverflow();
+	nes_cpu->clearNegative();
 
 	// If result is zero, set zero bit
-	if (result == ZERO) { nes_cpu->setP((nes_cpu->getP() & 0xfd) | 2); }
-	// Directly copy bit 6 into V flag
-	nes_cpu->setP((nes_cpu->getP() & 0xbf) | (result & OVRFLOW));
-
-	// Directly copy MSB into N flag
-	nes_cpu->setP((nes_cpu->getP() & 0x7f) | (result & NEGATIVE));
+	if (result == 0) nes_cpu->setZero();
+	if (data & 64) nes_cpu->setOverflow();
+	if (data & 128) nes_cpu->setNegative();
 }
 
 
@@ -525,17 +535,15 @@ void CMP(Byte opcode, Word address) {
 		break;
 	}
 
-	// Set zero flag to 0
-	nes_cpu->clearZero();
-
-	// Set carry flag if no borrow occurs
-	if (nes_cpu->getA() >= data) nes_cpu->setCarry();
-		// Set zero flag if result is 0
-	else if (nes_cpu->getA() == data) nes_cpu->setZero();
-	else nes_cpu->clearCarry();
 	int result = nes_cpu->getA() - data;
-	// Directly copy MSB into N flag
-	nes_cpu->setP((nes_cpu->getP() & 0x7f) | (result & NEGATIVE));
+
+	nes_cpu->clearZero();
+	nes_cpu->clearCarry();
+	nes_cpu->clearNegative();
+
+	if (result >= 0) nes_cpu->setCarry();
+	if (result % 256 == 0) nes_cpu->setZero();
+	if (result & 128) nes_cpu->setNegative();
 }
 
 /// <summary>
@@ -570,16 +578,15 @@ void CPX(Byte opcode, Word address) {
 		break;
 	}
 
-	// Set zero flag to 0
-	nes_cpu->clearZero();
-
-	// Set carry flag if no borrow occurs
-	if (nes_cpu->getX() >= data) nes_cpu->setCarry();
-		// Set zero flag if result is 0
-	else if (nes_cpu->getX() == data) nes_cpu->setZero();
 	int result = nes_cpu->getX() - data;
-	// Directly copy MSB into N flag
-	nes_cpu->setP((nes_cpu->getP() & 0x7f) | (result & NEGATIVE));
+
+	nes_cpu->clearZero();
+	nes_cpu->clearCarry();
+	nes_cpu->clearNegative();
+
+	if (result >= 0) nes_cpu->setCarry();
+	if (result % 256 == 0) nes_cpu->setZero();
+	if (result & 128) nes_cpu->setNegative();
 }
 
 /// <summary>
@@ -614,16 +621,15 @@ void CPY(Byte opcode, Word address) {
 		break;
 	}
 
-	// Set zero flag to 0
-	nes_cpu->clearZero();
-
-	// Set carry flag if no borrow occurs
-	if (nes_cpu->getY() >= data) nes_cpu->setCarry();
-		// Set zero flag if result is 0
-	else if (nes_cpu->getY() == data) nes_cpu->setZero();
 	int result = nes_cpu->getY() - data;
-	// Directly copy MSB into N flag
-	nes_cpu->setP((nes_cpu->getP() & 0x7f) | (result & NEGATIVE));
+
+	nes_cpu->clearZero();
+	nes_cpu->clearCarry();
+	nes_cpu->clearNegative();
+
+	if (result >= 0) nes_cpu->setCarry();
+	if (result % 256 == 0) nes_cpu->setZero();
+	if (result & 128) nes_cpu->setNegative();
 }
 
 void DEC(Byte opcode, Word address) {
@@ -632,25 +638,25 @@ void DEC(Byte opcode, Word address) {
 	// Set data to correct data depending on address mode
 	switch (opcode) {
 	// Zero page, 2 bytes, 3 cycles
-	case 0x65:
+	case 0xC6:
 		data = nes_cpu->zeroPagePeek(address);
 		nes_cpu->setCycleCount(2);
 		nes_cpu->incrementPCBy(2);
 		break;
 	// Zero page,X , 2 bytes, 4 cycles
-	case 0x75:
+	case 0xD6:
 		data = nes_cpu->zeroPageXPeek(address);
 		nes_cpu->setCycleCount(2);
 		nes_cpu->incrementPCBy(2);
 		break;
 	// Absolute, 3 bytes, 4 cycles
-	case 0x6d:
+	case 0xCE:
 		data = nes_cpu->absolutePeek(address);
 		nes_cpu->setCycleCount(3);
-		nes_cpu->incrementPCBy(2);
+		nes_cpu->incrementPCBy(3);
 		break;
 	// Absolute,X , 3 bytes, 4 cycles (5 if page crossed)
-	case 0x7d:
+	case 0xDE:
 		data = nes_cpu->absoluteXPeek(address);
 		nes_cpu->setCycleCount(3);
 		nes_cpu->incrementPCBy(3);
@@ -661,26 +667,24 @@ void DEC(Byte opcode, Word address) {
 
 	int result = data - 1;
 
-	// Set zero flag to 0
 	nes_cpu->clearZero();
+	nes_cpu->clearNegative();
 
-	// If result is zero, set zero bit
-	if (result == 0) { nes_cpu->setZero(); }
-	// Directly copy MSB into N flag
-	nes_cpu->setP((nes_cpu->getP() & 0x7f) | (result & NEGATIVE));
+	if (result == 0) nes_cpu->setZero();
+	if (result & 128) nes_cpu->setNegative();
 
 	// Set memory to result
 	switch (opcode) {
-	case 0x65:
+	case 0xC6:
 		nes_cpu->zeroPageSet(address, result);
 		break;
-	case 0x75:
+	case 0xD6:
 		nes_cpu->zeroPageXSet(address, result);
 		break;
-	case 0x6d:
+	case 0xCE:
 		nes_cpu->absoluteSet(address, result);
 		break;
-	case 0x7d:
+	case 0xDE:
 		nes_cpu->absoluteXSet(address, result);
 		break;
 	default:
@@ -689,33 +693,29 @@ void DEC(Byte opcode, Word address) {
 }
 
 void DEX(Byte opcode, Word address) {
-	int result = nes_cpu->getX() - 1;
+	Byte result = nes_cpu->getX() - 1;
 	nes_cpu->setCycleCount(2);
 	nes_cpu->incrementPCBy(1);
 
-	// Set zero flag to 0
 	nes_cpu->clearZero();
+	nes_cpu->clearNegative();
 
-	// If result is zero, set zero bit
-	if (result == 0) { nes_cpu->setZero(); }
-	// Directly copy MSB into N flag
-	nes_cpu->setP((nes_cpu->getP() & 0x7f) | (result & NEGATIVE));
+	if (result == 0) nes_cpu->setZero();
+	if (result & 128) nes_cpu->setNegative();
 
 	nes_cpu->setX(result);
 }
 
 void DEY(Byte opcode, Word address) {
-	int result = nes_cpu->getY() - 1;
+	Byte result = nes_cpu->getY() - 1;
 	nes_cpu->setCycleCount(2);
 	nes_cpu->incrementPCBy(1);
 
-	// Set zero flag to 0
 	nes_cpu->clearZero();
+	nes_cpu->clearNegative();
 
-	// If result is zero, set zero bit
-	if (result == 0) { nes_cpu->setZero(); }
-	// Directly copy MSB into N flag
-	nes_cpu->setP((nes_cpu->getP() & 0x7f) | (result & NEGATIVE));
+	if (result == 0) nes_cpu->setZero();
+	if (result & 128) nes_cpu->setNegative();
 
 	nes_cpu->setY(result);
 }
@@ -781,13 +781,13 @@ void EOR(Byte opcode, Word address) {
 
 	// Set zero flag to 0
 	nes_cpu->clearZero();
+	nes_cpu->clearNegative();
 
 	// If result is zero, set zero bit
-	if (result == 0) { nes_cpu->setZero(); }
-	// Directly copy MSB into N flag
-	nes_cpu->setP((nes_cpu->getP() & 0x7f) | (result & NEGATIVE));
+	if (result == 0) nes_cpu->setZero();
+	if (result & 128) nes_cpu->setNegative();
 
-	nes_cpu->setA(data);
+	nes_cpu->setA(result);
 }
 
 void INC(Byte opcode, Word address) {
@@ -795,26 +795,22 @@ void INC(Byte opcode, Word address) {
 
 	// Set data to correct data depending on address mode
 	switch (opcode) {
-	// Zero page, 2 bytes, 3 cycles
-	case 0x65:
+	case 0xE6:
 		data = nes_cpu->zeroPagePeek(address);
 		nes_cpu->setCycleCount(2);
 		nes_cpu->incrementPCBy(2);
 		break;
-	// Zero page,X , 2 bytes, 4 cycles
-	case 0x75:
+	case 0xF6:
 		data = nes_cpu->zeroPageXPeek(address);
 		nes_cpu->setCycleCount(2);
 		nes_cpu->incrementPCBy(2);
 		break;
-	// Absolute, 3 bytes, 4 cycles
-	case 0x6d:
+	case 0xEE:
 		data = nes_cpu->absolutePeek(address);
 		nes_cpu->setCycleCount(3);
 		nes_cpu->incrementPCBy(3);
 		break;
-	// Absolute,X , 3 bytes, 4 cycles (5 if page crossed)
-	case 0x7d:
+	case 0xFE:
 		data = nes_cpu->absoluteXPeek(address);
 		nes_cpu->setCycleCount(3);
 		nes_cpu->incrementPCBy(3);
@@ -823,28 +819,26 @@ void INC(Byte opcode, Word address) {
 		break;
 	}
 
-	int result = data + 1;
+	Byte result = data + 1;
 
-	// Set zero flag to 0
 	nes_cpu->clearZero();
+	nes_cpu->clearNegative();
 
-	// If result is zero, set zero bit
-	if (result == 0) { nes_cpu->setZero(); }
-	// Directly copy MSB into N flag
-	nes_cpu->setP((nes_cpu->getP() & 0x7f) | (result & NEGATIVE));
+	if (result == 0) nes_cpu->setZero();
+	if (result & 128) nes_cpu->setNegative();
 
 	// Set memory to result
 	switch (opcode) {
-	case 0x65:
+	case 0xE6:
 		nes_cpu->zeroPageSet(address, result);
 		break;
-	case 0x75:
+	case 0xF6:
 		nes_cpu->zeroPageXSet(address, result);
 		break;
-	case 0x6d:
+	case 0xEE:
 		nes_cpu->absoluteSet(address, result);
 		break;
-	case 0x7d:
+	case 0xFE:
 		nes_cpu->absoluteXSet(address, result);
 		break;
 	default:
@@ -853,52 +847,47 @@ void INC(Byte opcode, Word address) {
 }
 
 void INX(Byte opcode, Word address) {
-	int result = nes_cpu->getX() + 1;
+	Byte result = nes_cpu->getX() + 1;
 	nes_cpu->setCycleCount(2);
 	nes_cpu->incrementPCBy(1);
 
-	// Set zero flag to 0
 	nes_cpu->clearZero();
+	nes_cpu->clearNegative();
 
-	// If result is zero, set zero bit
-	if (result == 0) { nes_cpu->setZero(); }
-	// Directly copy MSB into N flag
-	nes_cpu->setP((nes_cpu->getP() & 0x7f) | (result & NEGATIVE));
+	if (result == 0) nes_cpu->setZero();
+	if (result & 128) nes_cpu->setNegative();
 
 	nes_cpu->setX(result);
 }
 
 void INY(Byte opcode, Word address) {
-	int result = nes_cpu->getY() + 1;
+	Byte result = nes_cpu->getY() + 1;
 	nes_cpu->setCycleCount(2);
 	nes_cpu->incrementPCBy(1);
 
-	// Set zero flag to 0
 	nes_cpu->clearZero();
+	nes_cpu->clearNegative();
 
-	// If result is zero, set zero bit
-	if (result == 0) { nes_cpu->setZero(); }
-	// Directly copy MSB into N flag
-	nes_cpu->setP((nes_cpu->getP() & 0x7f) | (result & NEGATIVE));
+	if (result == 0) nes_cpu->setZero();
+	if (result & 128) nes_cpu->setNegative();
 
 	nes_cpu->setY(result);
 }
 
-// TODO implement hardware bug present with this instruction
-// Read https://www.nesdev.org/wiki/Instruction_reference
 void JMP(Byte opcode, Word address) {
 	Word data = 0;
 
 	switch (opcode) {
 	case 0x4c:
-		data = nes_cpu->peek(address + 1) + (nes_cpu->peek(address + 2) << 8);
+		data = nes_cpu->correctPeek(address + 1) + (nes_cpu->correctPeek(address + 2) << 8);
 		nes_cpu->setCycleCount(3);
-		nes_cpu->incrementPCBy(3);
 		break;
 	case 0x6c:
-		data = nes_cpu->peek(address + 1) + (nes_cpu->peek(address + 2) << 8);
-		data = nes_cpu->peek(data) + (nes_cpu->peek(data + 1) << 8);
-		nes_cpu->incrementPCBy(3);
+		data = nes_cpu->correctPeek(address + 1) + (nes_cpu->correctPeek(address + 2) << 8);
+		// If hi byte would cross a page boudnary, wrap around to start of page instead
+		if (data % 256 == 0xff) data = nes_cpu->correctPeek(data) + (nes_cpu->correctPeek(data & 0xFF00) << 8);
+		// Hi byte does not cross page boundary
+		else data = nes_cpu->correctPeek(data) + (nes_cpu->correctPeek(data + 1) << 8);
 		nes_cpu->setCycleCount(5);
 		break;
 	default:
@@ -909,10 +898,9 @@ void JMP(Byte opcode, Word address) {
 }
 
 void JSR(Byte opcode, Word address) {
-	Word data = nes_cpu->peek(address + 1) + (nes_cpu->peek(address + 2) << 8);
-	nes_cpu->incrementPCBy(1);
+	Word data = nes_cpu->correctPeek(address + 1) + (nes_cpu->correctPeek(address + 2) << 8);
 
-	nes_cpu->pushStack(nes_cpu->getPC() + 2);
+	nes_cpu->pushStack2Byte(nes_cpu->getPC() + 2);
 	nes_cpu->setPC(data);
 
 	nes_cpu->setCycleCount(6);
@@ -979,11 +967,11 @@ void LDA(Byte opcode, Word address) {
 
 	// Set zero flag to 0
 	nes_cpu->clearZero();
+	nes_cpu->clearNegative();
 
 	// If result is zero, set zero bit
-	if (data == 0) { nes_cpu->setZero(); }
-	// Directly copy MSB into N flag
-	nes_cpu->setP((nes_cpu->getP() & 0x7f) | (data & NEGATIVE));
+	if (data == 0) nes_cpu->setZero(); 
+	if (data & 128) nes_cpu->setNegative();
 
 	nes_cpu->setA(data);
 }
@@ -1027,13 +1015,11 @@ void LDX(Byte opcode, Word address) {
 		break;
 	}
 
-	// Set zero flag to 0
 	nes_cpu->clearZero();
+	nes_cpu->clearNegative();
 
-	// If result is zero, set zero bit
-	if (data == 0) { nes_cpu->setZero(); }
-	// Directly copy MSB into N flag
-	nes_cpu->setP((nes_cpu->getP() & 0x7f) | (data & NEGATIVE));
+	if (data == 0) nes_cpu->setZero();
+	if (data & 128) nes_cpu->setNegative();
 
 	nes_cpu->setX(data);
 }
@@ -1077,13 +1063,11 @@ void LDY(Byte opcode, Word address) {
 		break;
 	}
 
-	// Set zero flag to 0
 	nes_cpu->clearZero();
+	nes_cpu->clearNegative();
 
-	// If result is zero, set zero bit
-	if (data == 0) { nes_cpu->setZero(); }
-	// Directly copy MSB into N flag
-	nes_cpu->setP((nes_cpu->getP() & 0x7f) | (data & NEGATIVE));
+	if (data == 0) nes_cpu->setZero();
+	if (data & 128) nes_cpu->setNegative();
 
 	nes_cpu->setY(data);
 }
@@ -1094,33 +1078,45 @@ void LSR(Byte opcode, Word address) {
 	// Set data to correct data depending on address mode
 	switch (opcode) {
 	// Accumulator 1 byte 2 cycles
-	case 0x0a:
+	case 0x4a:
+		data = nes_cpu->getA();
+
+		nes_cpu->clearCarry();
+		if (data & 1) nes_cpu->setCarry();
+
+		data >>= 1;
+
+		nes_cpu->clearZero();
+		nes_cpu->clearNegative();
+
+		
+		if (data == 0) nes_cpu->setZero();
+
 		// Carry flag if ASL with MSB set to 1
-		if (nes_cpu->getA() & 0x80) nes_cpu->setCarry();
-		nes_cpu->setA(nes_cpu->getA() << 1);
+		nes_cpu->setA(data);
 		nes_cpu->setCycleCount(2);
 		nes_cpu->incrementPCBy(1);
 		return; // Return as function completed
 	// Zero page, 2 bytes, 3 cycles
-	case 0x06:
+	case 0x46:
 		data = nes_cpu->zeroPagePeek(address);
 		nes_cpu->setCycleCount(5);
 		nes_cpu->incrementPCBy(2);
 		break;
 	// Zero page,X , 2 bytes, 4 cycles
-	case 0x16:
+	case 0x56:
 		data = nes_cpu->zeroPageXPeek(address);
 		nes_cpu->setCycleCount(6);
 		nes_cpu->incrementPCBy(2);
 		break;
 	// Absolute, 3 bytes, 4 cycles
-	case 0x0e:
+	case 0x4e:
 		data = nes_cpu->absolutePeek(address);
 		nes_cpu->setCycleCount(6);
 		nes_cpu->incrementPCBy(3);
 		break;
 	// Absolute,X , 3 bytes, 4 cycles (5 if page crossed)
-	case 0x1e:
+	case 0x5e:
 		data = nes_cpu->absoluteXPeek(address);
 		nes_cpu->setCycleCount(7);
 		nes_cpu->incrementPCBy(3);
@@ -1129,35 +1125,35 @@ void LSR(Byte opcode, Word address) {
 		break;
 	}
 
-	int result = data >> 1;
+	nes_cpu->clearCarry();
+	if (data & 1) nes_cpu->setCarry();
 
-	// Set zero flag to 0
+	data >>= 1;
+
 	nes_cpu->clearZero();
+	nes_cpu->clearNegative();
 
-	// Shift bit 0 into carry flag
-	nes_cpu->setP((nes_cpu->getP() & 0xfe) | (data & ZERO));
-	// If result is zero, set zero bit
-	if (result == 0) { nes_cpu->setZero(); }
-	// Directly copy MSB into N flag
-	nes_cpu->setP((nes_cpu->getP() & 0x7f) | (result & NEGATIVE));
+
+	if (data == 0) nes_cpu->setZero();
+
 
 	// Set memory to new value
 	switch (opcode) {
 	// Zero page, 2 bytes, 3 cycles
-	case 0x06:
-		nes_cpu->zeroPageSet(address, result);
+	case 0x46:
+		nes_cpu->zeroPageSet(address, data);
 		break;
 	// Zero page,X , 2 bytes, 4 cycles
-	case 0x16:
-		nes_cpu->zeroPageXSet(address, result);
+	case 0x56:
+		nes_cpu->zeroPageXSet(address, data);
 		break;
 	// Absolute, 3 bytes, 4 cycles
-	case 0x0e:
-		nes_cpu->absoluteSet(address, result);
+	case 0x4e:
+		nes_cpu->absoluteSet(address, data);
 		break;
 	// Absolute,X , 3 bytes, 4 cycles (5 if page crossed)
-	case 0x1e:
-		nes_cpu->absoluteXSet(address, result);
+	case 0x5e:
+		nes_cpu->absoluteXSet(address, data);
 		break;
 	default:
 		break;
@@ -1228,58 +1224,75 @@ void ORA(Byte opcode, Word address) {
 
 	Byte result = nes_cpu->getA() | data;
 
-	// Set zero flag to 0
 	nes_cpu->clearZero();
+	nes_cpu->clearNegative();
 
-	// If result is zero, set zero bit
-	if (result == 0) { nes_cpu->setZero(); }
-	// Directly copy MSB into N flag
-	nes_cpu->setP((nes_cpu->getP() & 0x7f) | (result & NEGATIVE));
+	if (result == 0) nes_cpu->setZero();
+	if (result & 128) nes_cpu->setNegative();
 
 	nes_cpu->setA(result);
 }
 
+// Push accumulator
 void PHA(Byte opcode, Word address) {
-	nes_cpu->pushStack(nes_cpu->getA());
+	nes_cpu->pushStack1Byte(nes_cpu->getA());
 	nes_cpu->setCycleCount(3);
 	nes_cpu->incrementPCBy(1);
 }
 
+// Push status flags
 void PHP(Byte opcode, Word address) {
-	nes_cpu->pushStack(nes_cpu->getP());
+	nes_cpu->pushStack1Byte(nes_cpu->getP() | BREAK);
 	nes_cpu->setCycleCount(3);
 	nes_cpu->incrementPCBy(1);
 }
 
+// Pull accumulator
 void PLA(Byte opcode, Word address) {
-	nes_cpu->setA(nes_cpu->pullStack());
+	nes_cpu->setA(nes_cpu->pullStack1Byte());
 	nes_cpu->setCycleCount(4);
 	nes_cpu->incrementPCBy(1);
 
-	// If result is zero, set zero bit
-	if (nes_cpu->getA() == 0) { nes_cpu->setZero(); }
-	// Directly copy MSB into N flag
-	nes_cpu->setP((nes_cpu->getP() & 0x7f) | (nes_cpu->getA() & NEGATIVE));
+	nes_cpu->clearZero();
+	nes_cpu->clearNegative();
+
+	if (nes_cpu->getA() == 0) nes_cpu->setZero();
+	if (nes_cpu->getA() & 128) nes_cpu->setNegative();
 }
 
+// Pull status flags
 void PLP(Byte opcode, Word address) {
-	nes_cpu->setP(nes_cpu->pullStack());
+	nes_cpu->setP(nes_cpu->pullStack1Byte() & ~BREAK | NONSENSE_FLAG);
 	nes_cpu->setCycleCount(4);
 	nes_cpu->incrementPCBy(1);
 }
 
 void ROL(Byte opcode, Word address) {
 	Byte data = 0;
+	int temp;
 
 	// Set data to correct data depending on address mode
 	switch (opcode) {
 	// Accumulator
 	case 0x2a:
-		// Carry flag if ASL with MSB set to 1
-		if (nes_cpu->getA() & 0x80) nes_cpu->setCarry();
-		nes_cpu->setCycleCount(2);
-		nes_cpu->setA(nes_cpu->getA() << 1);
+		data = nes_cpu->getA();
+		temp = nes_cpu->isCarrySet();
+
+		nes_cpu->clearCarry();
+		if (data & 128) nes_cpu->setCarry();
+
+		data <<= 1;
+		data |= temp;
+
+		nes_cpu->clearZero();
+		nes_cpu->clearNegative();
+
+		if (data == 0) nes_cpu->setZero();
+		if (data & 128) nes_cpu->setNegative();
+
+		nes_cpu->setA(data);
 		nes_cpu->incrementPCBy(1);
+		nes_cpu->setCycleCount(2);
 		return; // Return as function completed
 	// Zero page
 	case 0x26:
@@ -1309,44 +1322,37 @@ void ROL(Byte opcode, Word address) {
 		break;
 	}
 
+	temp = nes_cpu->isCarrySet();
 
-	int temp = nes_cpu->getP();
+	nes_cpu->clearCarry();
+	if (data & 128) nes_cpu->setCarry();
 
-	// Set zero flag to 0
+	data <<= 1;
+	data |= temp;
+
 	nes_cpu->clearZero();
+	nes_cpu->clearNegative();
 
-	// Shift bit 7 into carry flag
-	nes_cpu->setP((nes_cpu->getP() & 0xfe) | (data & NEGATIVE));
-
-	int result = data << 1;
-
-	// Shift old carry into bit 0
-	result |= temp;
-
-	// If there is an overflow, set carry bit
-	if (result > 0xFF) { nes_cpu->setCarry(); }
-	// If result is zero, set zero bit
-	else if (result == 0) { nes_cpu->setZero(); }
-	// Directly copy MSB into N flag
-	nes_cpu->setP((nes_cpu->getP() & 0x7f) | (result & NEGATIVE));
+	if (data == 0) nes_cpu->setZero();
+	if (data & 128) nes_cpu->setNegative();
 
 	// Set memory to new value
 	switch (opcode) {
 	// Zero page, 2 bytes, 3 cycles
 	case 0x26:
-		nes_cpu->zeroPageSet(address, result);
+		nes_cpu->zeroPageSet(address, data);
 		break;
 	// Zero page,X , 2 bytes, 4 cycles
 	case 0x36:
-		nes_cpu->zeroPageXSet(address, result);
+		nes_cpu->zeroPageXSet(address, data);
 		break;
 	// Absolute, 3 bytes, 4 cycles
 	case 0x2e:
-		nes_cpu->absoluteSet(address, result);
+		nes_cpu->absoluteSet(address, data);
 		break;
 	// Absolute,X , 3 bytes, 4 cycles (5 if page crossed)
 	case 0x3e:
-		nes_cpu->absoluteXSet(address, result);
+		nes_cpu->absoluteXSet(address, data);
 		break;
 	default:
 		break;
@@ -1355,16 +1361,30 @@ void ROL(Byte opcode, Word address) {
 
 void ROR(Byte opcode, Word address) {
 	Byte data = 0;
+	int temp;
 
 	// Set data to correct data depending on address mode
 	switch (opcode) {
 	// Accumulator 1 byte 2 cycles
 	case 0x6a:
-		// Carry flag if ASL with MSB set to 1
-		if (nes_cpu->getA() & 0x80) nes_cpu->setCarry();
-		nes_cpu->setCycleCount(2);
-		nes_cpu->setA(nes_cpu->getA() << 1);
+		data = nes_cpu->getA();
+		temp = nes_cpu->isCarrySet() << 7;
+
+		nes_cpu->clearCarry();
+		if (data & 1) nes_cpu->setCarry();
+
+		data >>= 1;
+		data |= temp;
+
+		nes_cpu->clearZero();
+		nes_cpu->clearNegative();
+
+		if (data == 0) nes_cpu->setZero();
+		if (data & 128) nes_cpu->setNegative();
+
+		nes_cpu->setA(data);
 		nes_cpu->incrementPCBy(1);
+		nes_cpu->setCycleCount(2);
 		return; // Return as function completed
 	// Zero page, 2 bytes, 3 cycles
 	case 0x66:
@@ -1394,62 +1414,54 @@ void ROR(Byte opcode, Word address) {
 		break;
 	}
 
+	// Left shift carry bit into bit position 7
+	temp = nes_cpu->isCarrySet() << 7;
 
-	int temp = nes_cpu->getP();
+	nes_cpu->clearCarry();
+	if (data & 1) nes_cpu->setCarry();
 
-	// Set zero flag to 0
+	data >>= 1;
+	data |= temp;
+
 	nes_cpu->clearZero();
+	nes_cpu->clearNegative();
 
-	// Shift bit 7 into carry flag
-	nes_cpu->setP((nes_cpu->getP() & 0xfe) | (data & NEGATIVE));
-
-	int result = data << 1;
-
-	// Shift old carry into bit 0
-	result |= temp;
-
-	// If there is an overflow, set carry bit
-	if (result > 0xFF) { nes_cpu->setCarry(); }
-	// If result is zero, set zero bit
-	else if (result == 0) { nes_cpu->setZero(); }
-	// Directly copy MSB into N flag
-	nes_cpu->setP((nes_cpu->getP() & 0x7f) | (result & NEGATIVE));
+	if (data == 0) nes_cpu->setZero();
+	if (data & 128) nes_cpu->setNegative();
 
 	// Set memory to new value
 	switch (opcode) {
-	// Zero page, 2 bytes, 3 cycles
 	case 0x66:
-		nes_cpu->zeroPageSet(address, result);
+		nes_cpu->zeroPageSet(address, data);
 		break;
-	// Zero page,X , 2 bytes, 4 cycles
 	case 0x76:
-		nes_cpu->zeroPageXSet(address, result);
+		nes_cpu->zeroPageXSet(address, data);
 		break;
-	// Absolute, 3 bytes, 4 cycles
 	case 0x6e:
-		nes_cpu->absoluteSet(address, result);
+		nes_cpu->absoluteSet(address, data);
 		break;
-	// Absolute,X , 3 bytes, 4 cycles (5 if page crossed)
 	case 0x7e:
-		nes_cpu->absoluteXSet(address, result);
+		nes_cpu->absoluteXSet(address, data);
 		break;
 	default:
 		break;
 	}
 }
 
+// Return from interrupt
 void RTI(Byte opcode, Word address) {
 	// Pull status flags from stack
-	nes_cpu->setP(nes_cpu->pullStack());
+	nes_cpu->setP(nes_cpu->pullStack1Byte() | NONSENSE_FLAG);
 
 	// Pull PC from stack
-	nes_cpu->setPC(nes_cpu->pullStack());
+	nes_cpu->setPC(nes_cpu->pullStack2Byte());
 	nes_cpu->setCycleCount(6);
 }
 
+// Return from subroutine
 void RTS(Byte opcode, Word address) {
 	// Pull PC from stuck and increment by 1
-	nes_cpu->setPC(nes_cpu->pullStack() + 1);
+	nes_cpu->setPC(nes_cpu->pullStack2Byte() + 1);
 	nes_cpu->setCycleCount(6);
 }
 
@@ -1511,19 +1523,17 @@ void SBC(Byte opcode, Word address) {
 	}
 
 	// Result of add
-	int result = nes_cpu->getA() + ~data + (nes_cpu->getP() & 1);
+	int result = nes_cpu->getA() - data - (1 - (nes_cpu->getP() & CARRY));
 
-	// Set zero flag to 0
 	nes_cpu->clearZero();
+	nes_cpu->clearCarry();
+	nes_cpu->clearOverflow();
+	nes_cpu->clearNegative();
 
-	// If there is an overflow, set carry bit
-	if (result >= 0) { nes_cpu->setCarry(); }
-	// If result is zero, set zero bit
-	if (result == 0) { nes_cpu->setZero(); }
-	// If result's sign is different from A's and memory's , signed overflow occured
-	if ((result ^ nes_cpu->getA()) & (result ^ ~data) & 0x80) { nes_cpu->setOverflow(); }
-	// Directly copy MSB into N flag
-	nes_cpu->setP((nes_cpu->getP() & 0x7f) | (result & NEGATIVE));
+	if (result >= 0) nes_cpu->setCarry();
+	if (result % 256 == 0) nes_cpu->setZero();
+	if ((result ^ nes_cpu->getA()) & (result ^ ~data) & 0x80) nes_cpu->setOverflow();
+	if (result & 128) nes_cpu->setNegative();
 
 	nes_cpu->setA(result);
 }
@@ -1534,6 +1544,7 @@ void SEC(Byte opcode, Word address) {
 	nes_cpu->incrementPCBy(1);
 }
 
+// Set decimal
 void SED(Byte opcode, Word address) {
 	nes_cpu->setDecimal();
 	nes_cpu->setCycleCount(2);
@@ -1600,19 +1611,19 @@ void STX(Byte opcode, Word address) {
 	// Store in memory
 	switch (opcode) {
 	// Zero page, 2 bytes, 3 cycles
-	case 0x85:
+	case 0x86:
 		nes_cpu->zeroPageSet(address, nes_cpu->getX());
 		nes_cpu->setCycleCount(3);
 		nes_cpu->incrementPCBy(2);
 		break;
 	// Zero page,Y , 2 bytes, 4 cycles
-	case 0x95:
+	case 0x96:
 		nes_cpu->zeroPageYSet(address, nes_cpu->getX());
 		nes_cpu->setCycleCount(4);
 		nes_cpu->incrementPCBy(2);
 		break;
 	// Absolute, 3 bytes, 4 cycles
-	case 0x8d:
+	case 0x8E:
 		nes_cpu->absoluteSet(address, nes_cpu->getX());
 		nes_cpu->setCycleCount(4);
 		nes_cpu->incrementPCBy(3);
@@ -1627,19 +1638,19 @@ void STY(Byte opcode, Word address) {
 	// Store in memory
 	switch (opcode) {
 	// Zero page, 2 bytes, 3 cycles
-	case 0x85:
+	case 0x84:
 		nes_cpu->zeroPageSet(address, nes_cpu->getY());
 		nes_cpu->setCycleCount(3);
 		nes_cpu->incrementPCBy(2);
 		break;
 	// Zero page,X , 2 bytes, 4 cycles
-	case 0x95:
+	case 0x94:
 		nes_cpu->zeroPageXSet(address, nes_cpu->getY());
 		nes_cpu->setCycleCount(4);
 		nes_cpu->incrementPCBy(2);
 		break;
 	// Absolute, 3 bytes, 4 cycles
-	case 0x8d:
+	case 0x8C:
 		nes_cpu->absoluteSet(address, nes_cpu->getY());
 		nes_cpu->setCycleCount(4);
 		nes_cpu->incrementPCBy(3);
@@ -1655,11 +1666,14 @@ void TAX(Byte opcode, Word address) {
 
 	nes_cpu->setX(result);
 
-	// If result is zero, set zero bit
-	if (result == 0) { nes_cpu->setZero(); }
-	// Directly copy MSB into N flag
-	nes_cpu->setP((nes_cpu->getP() & 0x7f) | (result & NEGATIVE));
+	nes_cpu->clearZero();
+	nes_cpu->clearNegative();
+
+	if (result == 0) nes_cpu->setZero();
+	if (result & 128) nes_cpu->setNegative();
+
 	nes_cpu->setCycleCount(2);
+	nes_cpu->incrementPCBy(1);
 }
 
 void TAY(Byte opcode, Word address) {
@@ -1667,10 +1681,12 @@ void TAY(Byte opcode, Word address) {
 
 	nes_cpu->setY(result);
 
-	// If result is zero, set zero bit
-	if (result == 0) { nes_cpu->setZero(); }
-	// Directly copy MSB into N flag
-	nes_cpu->setP((nes_cpu->getP() & 0x7f) | (result & NEGATIVE));
+	nes_cpu->clearZero();
+	nes_cpu->clearNegative();
+
+	if (result == 0) nes_cpu->setZero();
+	if (result & 128) nes_cpu->setNegative();
+
 	nes_cpu->setCycleCount(2);
 	nes_cpu->incrementPCBy(1);
 }
@@ -1680,10 +1696,12 @@ void TSX(Byte opcode, Word address) {
 
 	nes_cpu->setX(result);
 
-	// If result is zero, set zero bit
-	if (result == 0) { nes_cpu->setZero(); }
-	// Directly copy MSB into N flag
-	nes_cpu->setP((nes_cpu->getP() & 0x7f) | (result & NEGATIVE));
+	nes_cpu->clearZero();
+	nes_cpu->clearNegative();
+
+	if (result == 0) nes_cpu->setZero();
+	if (result & 128) nes_cpu->setNegative();
+
 	nes_cpu->setCycleCount(2);
 	nes_cpu->incrementPCBy(1);
 }
@@ -1693,10 +1711,12 @@ void TXA(Byte opcode, Word address) {
 
 	nes_cpu->setA(result);
 
-	// If result is zero, set zero bit
-	if (result == 0) { nes_cpu->setZero(); }
-	// Directly copy MSB into N flag
-	nes_cpu->setP((nes_cpu->getP() & 0x7f) | (result & NEGATIVE));
+	nes_cpu->clearZero();
+	nes_cpu->clearNegative();
+
+	if (result == 0) nes_cpu->setZero();
+	if (result & 128) nes_cpu->setNegative();
+
 	nes_cpu->setCycleCount(2);
 	nes_cpu->incrementPCBy(1);
 }
@@ -1706,10 +1726,6 @@ void TXS(Byte opcode, Word address) {
 
 	nes_cpu->setS(result);
 
-	// If result is zero, set zero bit
-	if (result == 0) { nes_cpu->setZero(); }
-	// Directly copy MSB into N flag
-	nes_cpu->setP((nes_cpu->getP() & 0x7f) | (result & NEGATIVE));
 	nes_cpu->setCycleCount(2);
 	nes_cpu->incrementPCBy(1);
 }
@@ -1719,10 +1735,12 @@ void TYA(Byte opcode, Word address) {
 
 	nes_cpu->setA(result);
 
-	// If result is zero, set zero bit
-	if (result == 0) { nes_cpu->setZero(); }
-	// Directly copy MSB into N flag
-	nes_cpu->setP((nes_cpu->getP() & 0x7f) | (result & NEGATIVE));
+	nes_cpu->clearZero();
+	nes_cpu->clearNegative();
+
+	if (result == 0) nes_cpu->setZero();
+	if (result & 128) nes_cpu->setNegative();
+
 	nes_cpu->setCycleCount(2);
 	nes_cpu->incrementPCBy(1);
 }
@@ -1731,6 +1749,10 @@ void TYA(Byte opcode, Word address) {
 /// Initialise the array of function pointers
 /// </summary>
 void decode::initFuncArray() {
+	for (int i = 0; i < 256; i++) {
+		opcodeFuncPointers[i] = BRK;
+	}
+
 	// ADC
 	opcodeFuncPointers[0x69] = ADC;
 	opcodeFuncPointers[0x65] = ADC;
@@ -1847,7 +1869,7 @@ void decode::initFuncArray() {
 	opcodeFuncPointers[0xE6] = INC;
 	opcodeFuncPointers[0xF6] = INC;
 	opcodeFuncPointers[0xEE] = INC;
-	opcodeFuncPointers[0xFF] = INC;
+	opcodeFuncPointers[0xFE] = INC;
 
 	// INX
 	opcodeFuncPointers[0xE8] = INX;
