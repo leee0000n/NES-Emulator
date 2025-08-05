@@ -1,4 +1,4 @@
-// ReSharper disable All
+
 #include "NES_CPU.h"
 #include "Opcodes.h"
 
@@ -25,13 +25,15 @@ static bool isAddressInRangeInclusive(Word address, Word addressLowerBound, Word
 }
 
 NES_CPU::NES_CPU() {
-	this->cycleCount = 0;
-	this->totalCycleCount = 0;
+	this->cycleCount = 7; // Power up sequence takes 7 cycles
+	this->totalCycleCount = 7;
 	this->openBusValue = 0;
 	this->isPRG_ROMMirrored = false;
+	this->pageBoundaryCrossedOnPeek = false;
 	this->power_up();
 
-	opcodes::initFuncArray();
+	opcodes::loadLegalOpcodes();
+	opcodes::loadIllegalOpcodes();
 }
 
 
@@ -65,7 +67,7 @@ void NES_CPU::reset() {
 void NES_CPU::run() {
 
 	// tODO Remove
-	int lineTarget = 5011;
+	int lineTarget = 5071;
 	int line = 1;
 
 	while (true) {
@@ -89,7 +91,7 @@ void NES_CPU::run() {
 			opcodes::opcodeFuncPointers[opcode](opcode, address);
 			this->totalCycleCount += cycleCount;
 
-			if (totalCycleCount > 26554) break;
+			this->pageBoundaryCrossedOnPeek = false;
 
 			cycleCount--;
 
@@ -214,12 +216,22 @@ Byte NES_CPU::absolutePeek(Word address) {
 }
 
 Byte NES_CPU::absoluteXPeek(Word address) {
-	Word absoluteXaddress = X + correctPeek(address + 1) + (correctPeek(address + 2) << 8);
+	Word absoluteaddress = correctPeek(address + 1) + (correctPeek(address + 2) << 8);
+	Word absoluteXaddress = absoluteaddress + X;
+
+	// Used for adding cycles when page boudnary crossed
+	if ((absoluteaddress & 0xFF00) != (absoluteXaddress & 0xFF00)) pageBoundaryCrossedOnPeek = true;
+
 	return correctPeek(absoluteXaddress);
 }
 
 Byte NES_CPU::absoluteYPeek(Word address) {
-	Word absoluteYaddress = Y + correctPeek(address + 1) + (correctPeek(address + 2) << 8);
+	Word absoluteaddress = correctPeek(address + 1) + (correctPeek(address + 2) << 8);
+	Word absoluteYaddress = absoluteaddress + Y;
+
+	// Used for adding cycles when page boudnary crossed
+	if ((absoluteaddress & 0xFF00) != (absoluteYaddress & 0xFF00)) pageBoundaryCrossedOnPeek = true;
+
 	return correctPeek(absoluteYaddress);
 }
 
@@ -237,9 +249,14 @@ Byte NES_CPU::indirectXPeek(Word address) {
 }
 
 Byte NES_CPU::indirectYPeek(Word address) {
-	Word indirectYPeek = correctPeek(address + 1);
-	Word lookupaddress = Y + correctPeek(indirectYPeek) + (correctPeek((indirectYPeek + 1) % 256) << 8);
-	return correctPeek(lookupaddress);
+	Word indirectPeek = correctPeek(address + 1);
+	indirectPeek = correctPeek(indirectPeek) + (correctPeek((indirectPeek + 1) % 256) << 8);
+	Word indirectYPeek = indirectPeek + Y;
+
+	// Used for adding cycles when page boudnary crossed
+	if ((indirectYPeek & 0xFF00) != (indirectPeek & 0xFF00)) pageBoundaryCrossedOnPeek = true;
+
+	return correctPeek(indirectYPeek);
 }
 
 void NES_CPU::set(Word address, Byte data) {
@@ -395,8 +412,8 @@ Word NES_CPU::pullStack2Byte() {
 	return memory[0x0100 + S - 1] + (memory[0x0100 + S] << 8);
 }
 
-void NES_CPU::setCycleCount(int cycleCount) {
-	this->cycleCount = cycleCount;
+void NES_CPU::setCycleCount(int c) {
+	cycleCount = c;
 }
 
 void NES_CPU::setCarry() {this->P |= CARRY;}
@@ -428,3 +445,11 @@ bool NES_CPU::isOverflowSet() const {
 void NES_CPU::setNegative() { this->P |= NEGATIVE; }
 void NES_CPU::clearNegative() { this->P &= ~NEGATIVE; }
 bool NES_CPU::isNegativeSet() const { return this->P & NEGATIVE; }
+
+void NES_CPU::setJAMOpcodeEncountered() {
+	this->JAMOpcodeEncountered = true;
+}
+
+bool NES_CPU::wasPageBoundaryCrossedOnPeek() const {
+	return pageBoundaryCrossedOnPeek;
+}

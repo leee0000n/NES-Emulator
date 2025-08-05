@@ -131,8 +131,9 @@ void NES_CPUdebug::logCPUState() {
 	cpuLog += "X:" + charToHex(nes_cpu->getX()) + " ";
 	cpuLog += "Y:" + charToHex(nes_cpu->getY()) + " ";
 	cpuLog += "P:" + charToHex(nes_cpu->getP()) + " ";
-	cpuLog += "SP:" + charToHex(nes_cpu->getS()) + "\n";
-	// TODO: add ppu scanlines and cycles logging
+	cpuLog += "SP:" + charToHex(nes_cpu->getS()) + " ";
+	// TODO: add ppu scanlines
+	cpuLog += "CYC:" + std::to_string(nes_cpu->getTotalCycleCount()) + "\n";
 
 	cpuTrace += cpuLog;
 }

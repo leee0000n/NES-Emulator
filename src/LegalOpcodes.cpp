@@ -2,7 +2,7 @@
 #include "Opcodes.h"
 
 // Function pointer array
-void (*decode::opcodeFuncPointers[256])(Byte, Word);
+void (*opcodes::opcodeFuncPointers[256])(Byte, Word);
 
 /// <summary>
 /// Add memory value and carry to accumulator
@@ -41,13 +41,13 @@ void ADC(Byte opcode, Word address) {
 	// Absolute,X , 3 bytes, 4 cycles (5 if page crossed)
 	case 0x7d:
 		data = nes_cpu->absoluteXPeek(address);
-		nes_cpu->setCycleCount(2);
+		nes_cpu->setCycleCount(4 + nes_cpu->wasPageBoundaryCrossedOnPeek());
 		nes_cpu->incrementPCBy(3);
 		break;
 	// Absolute,Y 3 bytes, 4 cycles (5 if page crossed)
 	case 0x79:
 		data = nes_cpu->absoluteYPeek(address);
-		nes_cpu->setCycleCount(2);
+		nes_cpu->setCycleCount(4 + nes_cpu->wasPageBoundaryCrossedOnPeek());
 		nes_cpu->incrementPCBy(3);
 		break;
 	// Indirect,X , 2 bytes, 6 cycles
@@ -59,7 +59,7 @@ void ADC(Byte opcode, Word address) {
 	// Indirect, Y 2 bytes, 5 cycles (6 if page crossed)
 	case 0x71:
 		data = nes_cpu->indirectYPeek(address);
-		nes_cpu->setCycleCount(5);
+		nes_cpu->setCycleCount(5 + nes_cpu->wasPageBoundaryCrossedOnPeek());
 		nes_cpu->incrementPCBy(2);
 		break;
 	default:
@@ -266,8 +266,14 @@ void BCC(Byte opcode, Word address) {
 
 	// If carry is clear
 	if (!nes_cpu->isCarrySet()) {
-		nes_cpu->incrementPCBy(static_cast<signed char>(data));
-		nes_cpu->setCycleCount(3);
+		bool incCycle = false;
+		int PC = nes_cpu->getPC();
+		signed char data2sComplement = static_cast<signed char>(data);
+
+		if ((PC & 0xFF00) != (PC + data2sComplement & 0xFF00)) incCycle = true;
+
+		nes_cpu->incrementPCBy(data2sComplement);
+		nes_cpu->setCycleCount(3 + incCycle);
 	}
 }
 
@@ -283,8 +289,14 @@ void BCS(Byte opcode, Word address) {
 
 	// If carry is set
 	if (nes_cpu->isCarrySet()) {
-		nes_cpu->incrementPCBy(static_cast<signed char>(data));
-		nes_cpu->setCycleCount(3);
+		bool incCycle = false;
+		int PC = nes_cpu->getPC();
+		signed char data2sComplement = static_cast<signed char>(data);
+
+		if ((PC & 0xFF00) != (PC + data2sComplement & 0xFF00)) incCycle = true;
+
+		nes_cpu->incrementPCBy(data2sComplement);
+		nes_cpu->setCycleCount(3 + incCycle);
 	}
 }
 
@@ -300,8 +312,14 @@ void BEQ(Byte opcode, Word address) {
 
 	// If zero is set
 	if (nes_cpu->isZeroSet()) {
-		nes_cpu->incrementPCBy(static_cast<signed char>(data));
-		nes_cpu->setCycleCount(3);
+		bool incCycle = false;
+		int PC = nes_cpu->getPC();
+		signed char data2sComplement = static_cast<signed char>(data);
+
+		if ((PC & 0xFF00) != (PC + data2sComplement & 0xFF00)) incCycle = true;
+
+		nes_cpu->incrementPCBy(data2sComplement);
+		nes_cpu->setCycleCount(3 + incCycle);
 	}
 }
 
@@ -316,12 +334,12 @@ void BIT(Byte opcode, Word address) {
 	switch (opcode) {
 	case 0x24:
 		data = nes_cpu->zeroPagePeek(address);
-		nes_cpu->setCycleCount(2);
+		nes_cpu->setCycleCount(3);
 		nes_cpu->incrementPCBy(2);
 		break;
 	case 0x2c:
 		data = nes_cpu->absolutePeek(address);
-		nes_cpu->setCycleCount(3);
+		nes_cpu->setCycleCount(4);
 		nes_cpu->incrementPCBy(3);
 		break;
 	default:
@@ -354,8 +372,14 @@ void BMI(Byte opcode, Word address) {
 
 	// If negative is set
 	if (nes_cpu->isNegativeSet()) {
-		nes_cpu->incrementPCBy(static_cast<signed char>(data));
-		nes_cpu->setCycleCount(3);
+		bool incCycle = false;
+		int PC = nes_cpu->getPC();
+		signed char data2sComplement = static_cast<signed char>(data);
+
+		if ((PC & 0xFF00) != (PC + data2sComplement & 0xFF00)) incCycle = true;
+
+		nes_cpu->incrementPCBy(data2sComplement);
+		nes_cpu->setCycleCount(3 + incCycle);;
 	}
 }
 
@@ -371,8 +395,14 @@ void BNE(Byte opcode, Word address) {
 
 	// If zero is clear
 	if (!(nes_cpu->isZeroSet())) {
-		nes_cpu->incrementPCBy(static_cast<signed char>(data));
-		nes_cpu->setCycleCount(3);
+		bool incCycle = false;
+		int PC = nes_cpu->getPC();
+		signed char data2sComplement = static_cast<signed char>(data);
+		
+		if ((PC & 0xFF00) != (PC + data2sComplement & 0xFF00)) incCycle = true;
+
+		nes_cpu->incrementPCBy(data2sComplement);
+		nes_cpu->setCycleCount(3 + incCycle);
 	}
 }
 
@@ -388,13 +418,26 @@ void BPL(Byte opcode, Word address) {
 
 	// If negative is clear
 	if (!(nes_cpu->isNegativeSet())) {
-		nes_cpu->incrementPCBy(static_cast<signed char>(data));
-		nes_cpu->setCycleCount(3);
+		bool incCycle = false;
+		int PC = nes_cpu->getPC();
+		signed char data2sComplement = static_cast<signed char>(data);
+
+		if ((PC & 0xFF00) != (PC + data2sComplement & 0xFF00)) incCycle = true;
+
+		nes_cpu->incrementPCBy(data2sComplement);
+		nes_cpu->setCycleCount(3 + incCycle);
 	}
 }
 
 void BRK(Byte opcode, Word address) {
-	// TODO
+	nes_cpu->pushStack2Byte(nes_cpu->getPC() + 2);
+	nes_cpu->pushStack1Byte(nes_cpu->getP() | BREAK);
+	nes_cpu->setInterruptDisable();
+
+	nes_cpu->setCycleCount(7);
+
+	address = nes_cpu->peek(0xFFFE) + nes_cpu->peek(0xFFFF) << 8;
+	nes_cpu->setPC(address);
 }
 
 /// <summary>
@@ -408,8 +451,14 @@ void BVC(Byte opcode, Word address) {
 	nes_cpu->incrementPCBy(2);
 
 	if (!nes_cpu->isOverflowSet()) {
-		nes_cpu->incrementPCBy(static_cast<signed char>(data));
-		nes_cpu->setCycleCount(3);
+		bool incCycle = false;
+		int PC = nes_cpu->getPC();
+		signed char data2sComplement = static_cast<signed char>(data);
+
+		if ((PC & 0xFF00) != (PC + data2sComplement & 0xFF00)) incCycle = true;
+
+		nes_cpu->incrementPCBy(data2sComplement);
+		nes_cpu->setCycleCount(3 + incCycle);
 	}
 }
 
@@ -424,8 +473,14 @@ void BVS(Byte opcode, Word address) {
 	nes_cpu->incrementPCBy(2);
 
 	if (nes_cpu->isOverflowSet()) {
-		nes_cpu->incrementPCBy(static_cast<signed char>(data));
-		nes_cpu->setCycleCount(3);
+		bool incCycle = false;
+		int PC = nes_cpu->getPC();
+		signed char data2sComplement = static_cast<signed char>(data);
+
+		if ((PC & 0xFF00) != (PC + data2sComplement & 0xFF00)) incCycle = true;
+
+		nes_cpu->incrementPCBy(data2sComplement);
+		nes_cpu->setCycleCount(3 + incCycle);
 	}
 }
 
@@ -640,25 +695,25 @@ void DEC(Byte opcode, Word address) {
 	// Zero page, 2 bytes, 3 cycles
 	case 0xC6:
 		data = nes_cpu->zeroPagePeek(address);
-		nes_cpu->setCycleCount(2);
+		nes_cpu->setCycleCount(5);
 		nes_cpu->incrementPCBy(2);
 		break;
 	// Zero page,X , 2 bytes, 4 cycles
 	case 0xD6:
 		data = nes_cpu->zeroPageXPeek(address);
-		nes_cpu->setCycleCount(2);
+		nes_cpu->setCycleCount(6);
 		nes_cpu->incrementPCBy(2);
 		break;
 	// Absolute, 3 bytes, 4 cycles
 	case 0xCE:
 		data = nes_cpu->absolutePeek(address);
-		nes_cpu->setCycleCount(3);
+		nes_cpu->setCycleCount(6);
 		nes_cpu->incrementPCBy(3);
 		break;
 	// Absolute,X , 3 bytes, 4 cycles (5 if page crossed)
 	case 0xDE:
 		data = nes_cpu->absoluteXPeek(address);
-		nes_cpu->setCycleCount(3);
+		nes_cpu->setCycleCount(7);
 		nes_cpu->incrementPCBy(3);
 		break;
 	default:
@@ -797,22 +852,22 @@ void INC(Byte opcode, Word address) {
 	switch (opcode) {
 	case 0xE6:
 		data = nes_cpu->zeroPagePeek(address);
-		nes_cpu->setCycleCount(2);
+		nes_cpu->setCycleCount(5);
 		nes_cpu->incrementPCBy(2);
 		break;
 	case 0xF6:
 		data = nes_cpu->zeroPageXPeek(address);
-		nes_cpu->setCycleCount(2);
+		nes_cpu->setCycleCount(6);
 		nes_cpu->incrementPCBy(2);
 		break;
 	case 0xEE:
 		data = nes_cpu->absolutePeek(address);
-		nes_cpu->setCycleCount(3);
+		nes_cpu->setCycleCount(6);
 		nes_cpu->incrementPCBy(3);
 		break;
 	case 0xFE:
 		data = nes_cpu->absoluteXPeek(address);
-		nes_cpu->setCycleCount(3);
+		nes_cpu->setCycleCount(7);
 		nes_cpu->incrementPCBy(3);
 		break;
 	default:
@@ -940,13 +995,13 @@ void LDA(Byte opcode, Word address) {
 	// Absolute,X , 3 bytes, 4 cycles (5 if page crossed)
 	case 0xbd:
 		data = nes_cpu->absoluteXPeek(address);
-		nes_cpu->setCycleCount(4);
+		nes_cpu->setCycleCount(4 + nes_cpu->wasPageBoundaryCrossedOnPeek());
 		nes_cpu->incrementPCBy(3);
 		break;
 	// Absolute,Y 3 bytes, 4 cycles (5 if page crossed)
 	case 0xb9:
 		data = nes_cpu->absoluteYPeek(address);
-		nes_cpu->setCycleCount(4);
+		nes_cpu->setCycleCount(4 + nes_cpu->wasPageBoundaryCrossedOnPeek());
 		nes_cpu->incrementPCBy(3);
 		break;
 	// Indirect,X , 2 bytes, 6 cycles
@@ -958,7 +1013,7 @@ void LDA(Byte opcode, Word address) {
 	// Indirect, Y 2 bytes, 5 cycles (6 if page crossed)
 	case 0xb1:
 		data = nes_cpu->indirectYPeek(address);
-		nes_cpu->setCycleCount(5);
+		nes_cpu->setCycleCount(5 + nes_cpu->wasPageBoundaryCrossedOnPeek());
 		nes_cpu->incrementPCBy(2);
 		break;
 	default:
@@ -990,25 +1045,25 @@ void LDX(Byte opcode, Word address) {
 	// Zero page, 2 bytes, 3 cycles
 	case 0xa6:
 		data = nes_cpu->zeroPagePeek(address);
-		nes_cpu->setCycleCount(2);
+		nes_cpu->setCycleCount(3);
 		nes_cpu->incrementPCBy(2);
 		break;
 	// Zero page,Y , 2 bytes, 4 cycles
 	case 0xb6:
 		data = nes_cpu->zeroPageYPeek(address);
-		nes_cpu->setCycleCount(2);
+		nes_cpu->setCycleCount(4);
 		nes_cpu->incrementPCBy(2);
 		break;
 	// Absolute, 3 bytes, 4 cycles
 	case 0xaE:
 		data = nes_cpu->absolutePeek(address);
-		nes_cpu->setCycleCount(3);
+		nes_cpu->setCycleCount(4);
 		nes_cpu->incrementPCBy(3);
 		break;
 	// Absolute,Y 3 bytes, 4 cycles (5 if page crossed)
 	case 0xbE:
 		data = nes_cpu->absoluteYPeek(address);
-		nes_cpu->setCycleCount(3);
+		nes_cpu->setCycleCount(4 + nes_cpu->wasPageBoundaryCrossedOnPeek());
 		nes_cpu->incrementPCBy(3);
 		break;
 	default:
@@ -1032,7 +1087,7 @@ void LDY(Byte opcode, Word address) {
 	// Immediate, 2 bytes, 2 cycles
 	case 0xa0:
 		data = nes_cpu->immediatePeek(address);
-		nes_cpu->setCycleCount(3);
+		nes_cpu->setCycleCount(2);
 		nes_cpu->incrementPCBy(2);
 		break;
 	// Zero page, 2 bytes, 3 cycles
@@ -1056,7 +1111,7 @@ void LDY(Byte opcode, Word address) {
 	// Absolute,X , 3 bytes, 4 cycles (5 if page crossed)
 	case 0xbc:
 		data = nes_cpu->absoluteXPeek(address);
-		nes_cpu->setCycleCount(4);
+		nes_cpu->setCycleCount(4 + nes_cpu->wasPageBoundaryCrossedOnPeek());
 		nes_cpu->incrementPCBy(3);
 		break;
 	default:
@@ -1748,7 +1803,7 @@ void TYA(Byte opcode, Word address) {
 /// <summary>
 /// Initialise the array of function pointers
 /// </summary>
-void decode::initFuncArray() {
+void opcodes::loadLegalOpcodes() {
 	for (int i = 0; i < 256; i++) {
 		opcodeFuncPointers[i] = BRK;
 	}

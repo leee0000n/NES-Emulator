@@ -66,7 +66,9 @@ private:
 	// regions of memory.
 	Byte openBusValue;
 
+	bool pageBoundaryCrossedOnPeek;
 	bool isPRG_ROMMirrored;
+	bool JAMOpcodeEncountered; // Might be useful
 
 	std::array<Byte, 65536> memory;
 public:
@@ -230,6 +232,10 @@ public:
 	void setNegative();
 	void clearNegative();
 	bool isNegativeSet() const;
+
+	void setJAMOpcodeEncountered();
+
+	bool wasPageBoundaryCrossedOnPeek() const;
 };
 
 extern NES_CPU* nes_cpu;

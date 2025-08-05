@@ -7,11 +7,15 @@ with open("correctTestLog.txt", "r") as f1:
             index += 1
             l1 = f1.readline()
             l2 = f2.readline()
-
+            
+            if (l2 == ""):
+                print("my trace EOF")
+                break
+            if (l1 == ""):
+                print("golden trace EOF")
+                break
             if (l1 != l2):
                 print("Line", index, "not the same")
                 break
-            elif (l2 == ""):
-                print("my trace EOF")
-                break
+            
           
