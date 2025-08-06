@@ -14,6 +14,11 @@ project ("NES_Emulator")
 set( SOURCE_PATH "${PROJECT_SOURCE_DIR}/src" )
 set( INCLUDE_PATH "${PROJECT_SOURCE_DIR}/include" )
 
+# Path to your SDL2 install
+set(SDL2_DIR "C:/dev/SDL2")                # Change this!
+set(SDL2_INCLUDE_DIR "${SDL2_DIR}/include")
+set(SDL2_LIBRARY_DIR "${SDL2_DIR}/lib/x64")    
+
 file( GLOB_RECURSE INCLUDES "${INCLUDE_PATH}/*.h" )
 file( GLOB_RECURSE CPPS "${SOURCE_PATH}/*.cpp" )
 
@@ -28,4 +33,9 @@ endif()
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${INCLUDE_PATH})
 
-# TODO: Add tests and install targets if needed.
+# Add SDL2 includes and libraries
+target_include_directories(${PROJECT_NAME} PRIVATE ${SDL2_INCLUDE_DIR})
+target_link_directories(${PROJECT_NAME} PRIVATE ${SDL2_LIBRARY_DIR})
+
+# Link the SDL2 library
+target_link_libraries(${PROJECT_NAME} PRIVATE SDL2)

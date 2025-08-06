@@ -1,11 +1,7 @@
 
 #include "NES_CPU.h"
+#include "NES_PPU.h"
 #include "Opcodes.h"
-
-// TODO: Remove this later
-#include "NES_CPUDebug.h"
-
-
 
 #include <iostream>
 #include <string>
@@ -66,10 +62,6 @@ void NES_CPU::reset() {
 
 void NES_CPU::run() {
 
-	// tODO Remove
-	int lineTarget = 5071;
-	int line = 1;
-
 	while (true) {
 		if (cycleCount <= 0) {
 			
@@ -79,24 +71,12 @@ void NES_CPU::run() {
 			// BREAK OPCODE
 			if (opcode == 0) break;
 
-			// Used for testing
-			NES_CPUdebug::logCPUState();
-
-			// todo remove
-			if (line == lineTarget) {
-				line = line;
-			}
-
 			// Run instruction at PC
 			opcodes::opcodeFuncPointers[opcode](opcode, address);
-			this->totalCycleCount += cycleCount;
 
 			this->pageBoundaryCrossedOnPeek = false;
 
 			cycleCount--;
-
-			// todo remove
-			line++;
 		}
 		else cycleCount--;
 	}
@@ -160,34 +140,48 @@ Byte NES_CPU::peek(Word address) {
 // - PPU might not be writable
 // - Take into account the fact that ROM is read only
 // - Take into account that there might be PRG RAM and CHR RAM instead of ROM
+
 Byte NES_CPU::correctPeek(Word address) {
-	// 0x0000 0x07FF is where ram is (2KB)
-	// Since ram is mirrored 3 times between 0x0800 and 0x1FFF, address % $0800 will
-	// Lead to data that would have been mirrored. Saves actually copying the data
-	// Into the "mirrored" sections
+	// Mirrorred RAM
 	if (isAddressInRangeInclusive(address, 0x0000, 0x1FFF)) {
-		this->openBusValue = memory[address % 0x0800];
 		return memory[address % 0x0800];
 	}
 
-	// 0x2000 - 0x2007 is where PPU registers are
-	// Mirrored every 8 bytes between 0x2008 - 0x3ff
+	// PPU registers
 	if (isAddressInRangeInclusive(address, 0x2000, 0x3FFF)) {
-		this->openBusValue = memory[address % 8 + 0x2000];
-		return memory[address % 8 + 0x2000];
+		// Because ppu registers are mirrored every 8 bytes
+		address = address % 8 + 0x2000;
+
+		switch (address) {
+		case 0x2000:
+			return ppu->CpuPpuLatchRead();
+		case 0x2001:
+			return ppu->CpuPpuLatchRead();
+		case 0x2002:
+			return ppu->PPUSTATUSread();
+		case 0x2003:
+			return ppu->CpuPpuLatchRead();
+		case 0x2004:
+			return ppu->OAMDATAread();
+		case 0x2005:
+			return ppu->CpuPpuLatchRead();
+		case 0x2006:
+			return ppu->CpuPpuLatchRead();
+		case 0x2007:
+			return ppu->PPUDATAread();
+		}
 	}
 
-	// 0x8000 - 0XFFFF is where PRG ROM is
-	// If program is 16kb, 0x8000 - 0XBFFF is mirrored into
-	// 0xC000 - FFFF. If prg rom is mirroed and address is between
-	// 0xC000 - 0xFFFF, read from 0x8000 - 0xBFFF to simulate mirrored
-	// memory
+	// OAMDMA address
+	if (address == 0x4014) {
+		return ppu->CpuPpuLatchRead();
+	}
+
+	// For mirrored RAM
 	if (isPRG_ROMMirrored && isAddressInRangeInclusive(address, 0xC000, 0XFFFF)) {
-		this->openBusValue = memory [ address % 0x4000 + 0x8000];
 		return memory[address % 0x4000 + 0x8000];
 	}
 
-	this->openBusValue = memory[address];
 	return memory[address];
 }
 
@@ -267,22 +261,48 @@ void NES_CPU::set(Word address, Byte data) {
 // - PPU might not be writable
 // - Take into account the fact that ROM is read only
 // - Take into account that there might be PRG RAM and CHR RAM instead of ROM
+
 void NES_CPU::correctSet(Word address, Byte data) {
-	// If in mirrored section of ram, only written to first
-	// 2kb of ram
+	// Ram and its mirrored sections
 	if (isAddressInRangeInclusive(address, 0x0000, 0x1FFF)) {
 		memory[address % 0x0800] = data;
 		return;
 	}
 
-	// If address points to mirrored section of ppu registers
-	// only write to first set of ppu registers 
+	// PPU registers
+	// Mirrored every 8 bytes
 	if (isAddressInRangeInclusive(address, 0x2000, 0x3FFF)) {
-		memory[address % 8 + 0x2000] = data;
+		address = address % 8 + 0x2000;
+
+		switch (address) {
+		case 0x2000:
+			ppu->PPUCTRLwrite(data);
+		case 0x2001:
+			ppu->PPUMASKwrite(data);
+		case 0x2002:
+			ppu->CpuPpuLatchwrite(data);
+		case 0x2003:
+			ppu->OAMADDRwrite(data);
+		case 0x2004:
+			ppu->OAMDATAwrite(data);
+		case 0x2005:
+			ppu->PPUSCROLLwrite(data);
+		case 0x2006:
+			ppu->PPUADDRwrite(data);
+		case 0x2007:
+			ppu->PPUDATAwrite(data);
+		}
+
 		return;
 	}
 
-	// If 
+	// OAMDMA register
+	if (address == 0x4014) {
+		ppu->OAMDMAwrite(data);
+		return;
+	}
+
+	// Mirrored PRG ROM
 	if (isPRG_ROMMirrored && isAddressInRangeInclusive(address, 0xC000, 0XFFFF)) {
 		memory[address % 0x4000 + 0x8000] = data;
 		return;
@@ -415,6 +435,11 @@ Word NES_CPU::pullStack2Byte() {
 void NES_CPU::setCycleCount(int c) {
 	cycleCount = c;
 }
+
+int NES_CPU::getCycleCount() const {
+	return cycleCount;
+}
+
 
 void NES_CPU::setCarry() {this->P |= CARRY;}
 void NES_CPU::clearCarry() { this->P &= ~CARRY;}

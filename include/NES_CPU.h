@@ -6,9 +6,8 @@
 #include <string>
 
 
-
-typedef unsigned char Byte;
-typedef unsigned short Word;
+using Byte = unsigned char;
+using Word = unsigned short;
 
 constexpr bool HI_BYTE_ENABLED = true;
 constexpr bool HI_BYTE_DISABLED = false;
@@ -171,6 +170,7 @@ public:
 	void set(Word address, Byte data);
 
 	void setCycleCount(int cycleCount);
+	int getCycleCount() const;
 
 
 	Byte getA() const;
