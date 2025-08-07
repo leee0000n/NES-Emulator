@@ -14,6 +14,8 @@ constexpr bool ODD_FRAME = true;
 
 constexpr int VBLANK = 0x80;
 
+constexpr int CHOSEN_PATTERN_TABLE = 0x08;
+
 struct Tile {
 	std::array<Byte, 16> tile8x8;
 };
@@ -126,8 +128,6 @@ class NES_PPU {
 	/// </summary>
 	Byte OAMDMA;
 
-	Word patternTableAddress;
-
 	Word V;
 
 	Word T;
@@ -171,7 +171,7 @@ class NES_PPU {
 
 	std::array<Byte, 16384> VRAM;
 
-	std::array<int, 256 * 240> screen;
+	std::array<int, 256 * 256> screen;
 
 public:
 
@@ -221,6 +221,9 @@ public:
 
 	int getPPUCycle();
 	int getPPUScanline();
+
+	void drawPatternTables();
+	void drawTile(int tileIndex, int tableNum);
 };
 
 extern NES_PPU* ppu;

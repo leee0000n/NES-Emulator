@@ -40,20 +40,7 @@ void NES_CPU::power_up() {
 	Y = 0;
 	P = 0x24; // Interrupt request (IRQ) disabled
 	S = 0xFD;
-	memory[0x4017] = 0x00; // Frame irq enabled
-	memory[0x4015] = 0x00; // All channels disabled
-
-	for (int address = 0x0000; address < 0xFFFF; address++) {
-		memory[address] = 0;
-	}
-
-	//for (int address = 0x4000; address <= 0x400F; address++) { // $4000-$400F = $00
-	//	memory[address] = 0x00;
-	//}
-
-	//for (int address = 0x4010; address <= 0x4013; address++) { // $4010-$4013 = $00 ( Eliminator Boat Duel )
-	//	memory[address] = 0x00;
-	//}
+	memory.fill(0);
 }
 
 void NES_CPU::reset() {
@@ -62,22 +49,37 @@ void NES_CPU::reset() {
 }
 
 void NES_CPU::run() {
-	if (cycleCount <= 0) {
+	int line = 1;
+	int targetLine = 2;
+	while (true) {
 		
-		Byte opcode = correctPeek(PC);
-		Word address = PC;
-		
-		// BREAK OPCODE
-		if (opcode == 0) return;
 
-		// Run instruction at PC
-		opcodes::opcodeFuncPointers[opcode](opcode, address);
+		if (cycleCount <= 0) {
 
-		this->pageBoundaryCrossedOnPeek = false;
+			if (NMI) {
+				pushStack2Byte(PC);
+				pushStack1Byte(P);
+				P |= INTERRUPT_DISABLE;
 
-		cycleCount--;
+				PC = nes_cpu->correctPeek(0xFFFA) + (nes_cpu->correctPeek(0xFFFB) << 8);
+				NMI = false;
+			}
+
+			Byte opcode = correctPeek(PC);
+			Word address = PC;
+
+			// BREAK OPCODE
+			if (opcode == 0) return;
+
+			// Run instruction at PC
+			opcodes::opcodeFuncPointers[opcode](opcode, address);
+			line++;
+			pageBoundaryCrossedOnPeek = false;
+
+			cycleCount--;
+		}
+		else cycleCount--;
 	}
-	else cycleCount--;
 }
 
 

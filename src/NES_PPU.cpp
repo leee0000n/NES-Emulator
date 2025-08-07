@@ -20,12 +20,22 @@ NES_PPU::NES_PPU() {
 	this->scanlineNum = 0;
 	this->ppuCycle = 0;
 	this->CpuPpuLatch = 0x00;
+	this->screen.fill(-1);
+	this->VRAM.fill(0);
 
 	reset();
 	powerup();
 	loadPalFile("dd");
 
 	srand(124463453);
+
+	for (int i = 0x23c0; i < 0x23c0 + 64; i++) {
+		VRAM[i] = rand() % 256;
+	}
+
+	for (int i = 0x3f00; i < 0x3fff; i++) {
+		VRAM[i] = rand() % 13;
+	}
 }
 
 
@@ -53,34 +63,35 @@ void NES_PPU::powerup() {
 
 	writeLatch = FIRST_WRITE;
 	frameType = EVEN_FRAME;
-
-	for (int i = 0x2000; i < 0x23FF; i++) {
-		VRAM[i] = rand() % 256;
-	}
 }
 
 void NES_PPU::run() {
 	// Render
 	if (scanlineNum >=0 && scanlineNum < 240) {
 		if (ppuCycle >= 0 && ppuCycle < 256) {
+
+			if (scanlineNum == 0 && ppuCycle == 8) {
+				scanlineNum = scanlineNum;
+			}
 			int coarseX = ppuCycle / 8;
 			int coarseY = scanlineNum / 8;
 
 			int fineY = scanlineNum % 8;
 
 			Word nametableAddress = 0x2000 + 32 * coarseY + coarseX;
-			Byte patternTableAddress = correctPeek(nametableAddress);
+			int patternTableIndex = correctPeek(nametableAddress);
+			Word patternTableAddress = patternTableIndex * 16 + 0x1000 * ((PPUCTRL & CHOSEN_PATTERN_TABLE) >> 3);
 
 			Byte loByte = correctPeek(patternTableAddress + fineY);
 			Byte hiByte = correctPeek(patternTableAddress + 8 + fineY);
 
 			// Byte in attribute table for corresponding 4x4 tile (attribyte = attribute byte! hehe)
-			Byte attribyte = correctPeek(0x23c0 + coarseX + coarseY * 8);
+			Byte attribyte = correctPeek(0x23c0 + coarseX / 4 + coarseY / 4 * 8);
 
 			// Used to determine which part of the attribyte to use
 			// when deciding which palette to use
-			int attribyteX = ppuCycle / 16;
-			int attribyteY = scanlineNum / 16;
+			int attribyteX = ppuCycle % 8;
+			int attribyteY = scanlineNum / 8;
 
 			int paletteChoice = attribyte >> (attribyteY % 2 * 4) >>
 							    (attribyteX % 2);
@@ -97,6 +108,7 @@ void NES_PPU::run() {
 	// Set VBLANK
 	else if (scanlineNum == 241 && ppuCycle == 1) {
 		PPUCTRL |= VBLANK;
+		nes_cpu->setNMI();
 	}
 
 
@@ -110,6 +122,7 @@ void NES_PPU::run() {
 		// Clear VBLANK
 		if (ppuCycle == 1) {
 			PPUCTRL &= ~VBLANK;
+			nes_cpu->setNMI();
 		}
 	}
 
@@ -124,13 +137,14 @@ void NES_PPU::run() {
 
 void NES_PPU::addToScreen(Byte loByte, Byte hiByte, Byte attribyte, int paletteChoice) {
 	int i = ppuCycle % 8;
-	Byte nesColourValue = ((loByte & (128 >> i)) >> 7) | ((hiByte & (128 >> i)) >> 6);
+	Byte nesColourValue = (((loByte << i) & 128) >> 7) | (((hiByte << i) & 128) >> 6);
 	Word colourAddress = 0x3F0 + paletteChoice * 4 + nesColourValue;
 
 	if ((colourAddress - 0x3F0) % 4 == 0) {
 		screen[scanlineNum * 256 + ppuCycle] = -1;
 		return;
 	}
+
 	int colour = correctPeek(colourAddress);
 	screen[scanlineNum * 256 + ppuCycle] = colour % 0x3F;
 }
@@ -321,7 +335,7 @@ void NES_PPU::OAMADDRwrite(Byte data) {
 }
 
 void NES_PPU::OAMDATAwrite(Byte data) {
-	OAMDATA = data;
+	OAM[OAMADDR] = data;
 	CpuPpuLatch = data;
 }
 
@@ -330,21 +344,35 @@ Byte NES_PPU::OAMDATAread() const {
 }
 
 void NES_PPU::PPUSCROLLwrite(Byte data) {
-	PPUSCROLL = data << (8 * writeLatch);
+	if (writeLatch == FIRST_WRITE) {
+		PPUSCROLL = (PPUSCROLL & 0x00FF) | ((data) << 8); // REMOVE 2 MSB since they are irrelevant
+	}
+	else {
+		PPUSCROLL = (PPUSCROLL & 0xFF00) | data;
+	}
 	writeLatch = !writeLatch;
 
 	CpuPpuLatch = data;
 }
 
 void NES_PPU::PPUADDRwrite(Byte data) {
-	PPUADDR = data << (8 * writeLatch);
+	if (writeLatch == FIRST_WRITE) {
+		PPUADDR = (PPUADDR & 0x00FF) | ((data & 0x3F) << 8); // REMOVE 2 MSB since they are irrelevant
+	}
+	else {
+		PPUADDR = (PPUADDR & 0xFF00) | data;
+	}
 	writeLatch = !writeLatch;
 
 	CpuPpuLatch = data;
 }
 
 void NES_PPU::PPUDATAwrite(Byte data) {
-	PPUDATA = data;
+	if (PPUADDR >= 0x2fc0 && PPUADDR < 0x2fc0 + 64 ) {
+		ppuCycle = ppuCycle;
+	}
+
+	VRAM[PPUADDR] = data;
 	CpuPpuLatch = data;
 }
 
@@ -363,6 +391,58 @@ int NES_PPU::getPPUCycle() {
 
 int NES_PPU::getPPUScanline() {
 	return scanlineNum;
+}
+
+void NES_PPU::drawPatternTables() {
+	for (int i = 0; i < 255; i++) {
+		drawTile(i, 0);
+		drawTile(i, 1);
+	}
+
+	render::renderScreen(screen);
+}
+void NES_PPU::drawTile(int tileIndex, int tableNum) {
+	for (int i = 0; i < 8; i++) {
+		Word loByteAddress = tileIndex * 16 + i + 0x1000 * tableNum;
+		Byte loByte = correctPeek(loByteAddress);
+		Byte hiByte = correctPeek(loByteAddress + 8);
+
+		int tileX = tileIndex % 16 * 8;
+		int tileY = tileIndex / 16 * 256 * 8;
+
+		for (int j = 0; j < 8; j++) {
+			int colourChoice = ((loByte & 128) >> 7) + ((hiByte & 128) >> 6);
+
+			
+			if (colourChoice == 0) {
+				screen[j + i * 64] = -1;
+			}
+			
+			else {
+				int x = tileIndex % 16;
+				int y = tileIndex / 16;
+
+				int gridX = x / 2;
+				int gridY = y / 2;
+
+				int attribyte = correctPeek(0x23C0 + gridX + gridY * 8);
+
+				int decideX = x % 2;
+				int decideY = y % 2;
+
+				int paletteIndex = (attribyte >> (decideX * 2)) >> (decideY * 4);
+				paletteIndex &= 0x03;
+
+				Word colouraddress = 0x3F00 + paletteIndex * 4 + colourChoice;
+				int colour = correctPeek(colouraddress);
+
+				screen[j + i * 256 + tileX + tileY + tableNum * 128] = colour;
+			}
+			int b = j + i * 256 + tileX + tileY;
+			loByte <<= 1;
+			hiByte <<= 1;
+		}
+	}
 }
 
 

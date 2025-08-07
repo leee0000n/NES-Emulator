@@ -13,6 +13,7 @@ CMakeUserPresets.json
 .vs/
 Folder.DotSettings.user
 out/
+resoure/*.nes
 
 # CLion
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can

@@ -9,7 +9,7 @@ SDL_Renderer* gRenderer;
 
 std::array<int, 64> render::nesPaletteAsRGB;
 
-constexpr int pixelSideLength = 2;
+constexpr int pixelSideLength = 3;
 
 /// Converts nes colour to rgb colour
 /// @param colour nes colour
@@ -21,7 +21,7 @@ void setPixelColour(int colour) {
 	SDL_SetRenderDrawColor(gRenderer, r, g, b, 0xff);
 }
 
-void render::renderScreen(const std::array<int, 256 * 240>& screen) {
+void render::renderScreen(const std::array<int, 256 * 256>& screen) {
 	SDL_SetRenderDrawColor(gRenderer, 0, 0, 0, 0);
 	SDL_RenderClear(gRenderer);
 

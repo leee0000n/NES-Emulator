@@ -837,7 +837,7 @@ void NOPabsoluteX(Byte opcode, Word address) {
 // TODO check if putting FF in openBusValue is valid
 // Freeze CPU by not incrementing PC
 void JAM(Byte opcode, Word address) {
-	nes_cpu->setJAMOpcodeEncountered();
+	// Does nothing
 }
 
 void opcodes::loadIllegalOpcodes() {
