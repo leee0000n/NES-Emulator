@@ -67,7 +67,7 @@ private:
 
 	bool pageBoundaryCrossedOnPeek;
 	bool isPRG_ROMMirrored;
-	bool JAMOpcodeEncountered; // Might be useful
+	bool NMI;
 
 	std::array<Byte, 65536> memory;
 public:
@@ -233,9 +233,9 @@ public:
 	void clearNegative();
 	bool isNegativeSet() const;
 
-	void setJAMOpcodeEncountered();
-
 	bool wasPageBoundaryCrossedOnPeek() const;
+
+	void setNMI();
 };
 
 extern NES_CPU* nes_cpu;

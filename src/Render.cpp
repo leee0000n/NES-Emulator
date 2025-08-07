@@ -7,21 +7,44 @@
 SDL_Window* gWindow;
 SDL_Renderer* gRenderer;
 
+std::array<int, 64> render::nesPaletteAsRGB;
+
+constexpr int pixelSideLength = 2;
+
 /// Converts nes colour to rgb colour
 /// @param colour nes colour
 void setPixelColour(int colour) {
-	SDL_SetRenderDrawColor(gRenderer, 255, 0, 0, 255);
+	int r = render::nesPaletteAsRGB[colour] >> 16;
+	int g = (render::nesPaletteAsRGB[colour] >> 8) % 256;
+	int b = render::nesPaletteAsRGB[colour] % 256;
+
+	SDL_SetRenderDrawColor(gRenderer, r, g, b, 0xff);
 }
 
-void render::renderScreen(std::array<int, 256 * 240> screen) {
+void render::renderScreen(const std::array<int, 256 * 240>& screen) {
+	SDL_SetRenderDrawColor(gRenderer, 0, 0, 0, 0);
+	SDL_RenderClear(gRenderer);
+
 	for (int i = 0; i < 61440; i++) {
 		const int x = i % 256;
 		const int y = i / 256;
 		const int colour = screen[i];
 
+		if (colour == -1) {
+			continue;
+		}
+
 		setPixelColour(colour);
-		SDL_RenderDrawPoint(gRenderer, x, y);
+		if (pixelSideLength == 1) {
+			SDL_RenderDrawPoint(gRenderer, x, y);
+		}
+		else {
+			SDL_Rect r = {x * pixelSideLength, y * pixelSideLength, pixelSideLength, pixelSideLength };
+			SDL_RenderFillRect(gRenderer, &r);
+		}
 	}
+
+	SDL_RenderPresent(gRenderer);
 }
 
 bool render::initSDL2() {
@@ -40,7 +63,7 @@ bool render::initSDL2() {
 		}
 
 		//Create window
-		gWindow = SDL_CreateWindow("SDL Tutorial", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
+		gWindow = SDL_CreateWindow("SDL Tutorial", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH * pixelSideLength, SCREEN_HEIGHT * pixelSideLength, SDL_WINDOW_SHOWN);
 		if (gWindow == NULL) {
 			printf("Window could not be created! SDL Error: %s\n", SDL_GetError());
 			success = false;
@@ -54,7 +77,7 @@ bool render::initSDL2() {
 			}
 			else {
 				//Initialize renderer color
-				SDL_SetRenderDrawColor(gRenderer, 0xFF, 0xFF, 0xFF, 0xFF);
+				SDL_SetRenderDrawColor(gRenderer, 0xFF, 0, 0xFF, 0xFF);
 			}
 		}
 	}

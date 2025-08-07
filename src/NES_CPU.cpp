@@ -26,6 +26,7 @@ NES_CPU::NES_CPU() {
 	this->openBusValue = 0;
 	this->isPRG_ROMMirrored = false;
 	this->pageBoundaryCrossedOnPeek = false;
+	this->NMI = false;
 	this->power_up();
 
 	opcodes::loadLegalOpcodes();
@@ -61,25 +62,22 @@ void NES_CPU::reset() {
 }
 
 void NES_CPU::run() {
+	if (cycleCount <= 0) {
+		
+		Byte opcode = correctPeek(PC);
+		Word address = PC;
+		
+		// BREAK OPCODE
+		if (opcode == 0) return;
 
-	while (true) {
-		if (cycleCount <= 0) {
-			
-			Byte opcode = correctPeek(PC);
-			Word address = PC;
-			
-			// BREAK OPCODE
-			if (opcode == 0) break;
+		// Run instruction at PC
+		opcodes::opcodeFuncPointers[opcode](opcode, address);
 
-			// Run instruction at PC
-			opcodes::opcodeFuncPointers[opcode](opcode, address);
+		this->pageBoundaryCrossedOnPeek = false;
 
-			this->pageBoundaryCrossedOnPeek = false;
-
-			cycleCount--;
-		}
-		else cycleCount--;
+		cycleCount--;
 	}
+	else cycleCount--;
 }
 
 
@@ -118,7 +116,14 @@ bool NES_CPU::loadROM(std::string path) {
 
 		// Load 16 KB after first 16 bytes
 		for (int i = 0; i < 0x4000; i++) {
-			nes_cpu->memory[0X8000 + i] = buffer[16 + i];
+			nes_cpu->memory[0x8000 + i] = buffer[16 + i];
+		}
+
+		if (!isPRG_ROMMirrored) {
+			// Load second set of 16kb if rom not mirrored
+			for (int i = 0x4000; i < 0x10000; i++) {
+				nes_cpu->memory[0xC000 + i] = buffer[16 + i];
+			}
 		}
 
 	}
@@ -130,16 +135,9 @@ bool NES_CPU::loadROM(std::string path) {
 	return true;
 }
 
-
-
 Byte NES_CPU::peek(Word address) {
 	return memory[address];
 }
-
-// TODO:
-// - PPU might not be writable
-// - Take into account the fact that ROM is read only
-// - Take into account that there might be PRG RAM and CHR RAM instead of ROM
 
 Byte NES_CPU::correctPeek(Word address) {
 	// Mirrorred RAM
@@ -235,7 +233,6 @@ Byte NES_CPU::indirectPeek(Word address) {
 	return correctPeek(lookupaddress);
 }
 
-
 Byte NES_CPU::indirectXPeek(Word address) {
 	Word indirectXPeek = correctPeek(address + 1) + X;
 	Word lookupaddress = correctPeek(indirectXPeek % 256) + (correctPeek((indirectXPeek + 1) % 256) << 8);
@@ -256,11 +253,6 @@ Byte NES_CPU::indirectYPeek(Word address) {
 void NES_CPU::set(Word address, Byte data) {
 	memory[address] = data;
 }
-
-// TODO:
-// - PPU might not be writable
-// - Take into account the fact that ROM is read only
-// - Take into account that there might be PRG RAM and CHR RAM instead of ROM
 
 void NES_CPU::correctSet(Word address, Byte data) {
 	// Ram and its mirrored sections
@@ -310,7 +302,6 @@ void NES_CPU::correctSet(Word address, Byte data) {
 
 	memory[address] = data;
 }
-
 
 void NES_CPU::zeroPageSet(Word address, Byte data) {
 	address = correctPeek(address + 1);
@@ -471,10 +462,11 @@ void NES_CPU::setNegative() { this->P |= NEGATIVE; }
 void NES_CPU::clearNegative() { this->P &= ~NEGATIVE; }
 bool NES_CPU::isNegativeSet() const { return this->P & NEGATIVE; }
 
-void NES_CPU::setJAMOpcodeEncountered() {
-	this->JAMOpcodeEncountered = true;
-}
-
 bool NES_CPU::wasPageBoundaryCrossedOnPeek() const {
 	return pageBoundaryCrossedOnPeek;
 }
+
+void NES_CPU::setNMI() {
+	NMI = true;
+}
+

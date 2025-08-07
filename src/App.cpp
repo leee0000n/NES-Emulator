@@ -8,19 +8,31 @@ void App::run() {
 	nes_cpu = new NES_CPU();
 	ppu = new NES_PPU();
 
+	std::string rom = "C:/Users/leon_/source/repos/NES-Emulator/resource/donkey-kong.nes"
+;
+	nes_cpu->loadROM(rom);
+	ppu->loadCHRROM(rom);
+
 	// Set program counter to start of instructions
-	nes_cpu->setPC(0xC000);
-
-	nes_cpu->loadROM("C:/Users/leon_/source/repos/NES-Emulator/resource/nestest.nes");
-
-	// Run program
-	nes_cpu->run();
+	Word startaddress = nes_cpu->correctPeek(0xFFFC) + (nes_cpu->correctPeek(0xFFFD) << 8);
+	nes_cpu->setPC(startaddress);
 
 	render::initSDL2();
+
+	// Run program
+	while (true) {
+		if (ppu->getPPUCycle() % 3 == 0) {
+			nes_cpu->run();
+		}
+		ppu->run();
+
+	}
+
 	render::closeSDL2();
 
+
 	// print pages
-	NES_CPUdebug::printMemoryMirrored(0x0000, 0x0000);
+	NES_CPUdebug::printMemoryMirrored(0xBF, 0xBF);
 
 	NES_CPUdebug::addCPUTraceToFile("C:/Users/leon_/source/repos/NES-Emulator/resource/cpuTrace.txt");
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <string>
 
 using Byte = unsigned char;
 using Word = unsigned short;
@@ -10,6 +11,12 @@ constexpr bool SECOND_WRITE = false;
 
 constexpr bool EVEN_FRAME = false;
 constexpr bool ODD_FRAME = true;
+
+constexpr int VBLANK = 0x80;
+
+struct Tile {
+	std::array<Byte, 16> tile8x8;
+};
 
 /* PPUCTRL
 VPHB SINN
@@ -119,12 +126,18 @@ class NES_PPU {
 	/// </summary>
 	Byte OAMDMA;
 
+	Word patternTableAddress;
+
+	Word V;
+
+	Word T;
 	/// <summary>
 	/// When data is written to ppu registers, bus acts as an 8 bit latch.
 	/// Writes to read only registers still update this latch
 	/// Reads from write only registers return data stored here
 	/// </summary>
 	Byte CpuPpuLatch;
+
 
 	/// <summary>
 	/// used when writing to PPUSCROLL and PPUADDR.
@@ -141,7 +154,7 @@ class NES_PPU {
 	bool frameType;
 
 	int scanlineNum;
-	int pixelNum;
+	int ppuCycle;
 
 
 	/// <summary>
@@ -150,9 +163,20 @@ class NES_PPU {
 	/// </summary>
 	std::array<Byte, 256> OAM;
 
+	/// <summary>
+	/// Contains 8 sprites that are to be drawn on current scanline
+	/// Re fetched each scanline
+	/// </summary>
+	std::array<Byte, 32> spriteEvalutionBuffer;
+
 	std::array<Byte, 16384> VRAM;
 
+	std::array<int, 256 * 240> screen;
+
 public:
+
+	NES_PPU();
+
 	void reset();
 
 	void powerup();
@@ -162,6 +186,13 @@ public:
 	/// cycle
 	/// </summary>
 	void run();
+
+	void addToScreen(Byte loByte, Byte hiByte, Byte attribyte, int paletteChoice);
+
+	void default2c02Palette();
+
+	bool loadCHRROM(std::string path);
+	bool loadPalFile(std::string path);
 
 	Byte correctPeek(Word address);
 
@@ -187,6 +218,9 @@ public:
 	Byte PPUDATAread() const;
 
 	void OAMDMAwrite(Byte data);
+
+	int getPPUCycle();
+	int getPPUScanline();
 };
 
 extern NES_PPU* ppu;
