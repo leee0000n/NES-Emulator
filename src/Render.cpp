@@ -21,8 +21,9 @@ void setPixelColour(int colour) {
 	SDL_SetRenderDrawColor(gRenderer, r, g, b, 0xff);
 }
 
-void render::renderScreen(const std::array<int, 256 * 256>& screen) {
-	SDL_SetRenderDrawColor(gRenderer, 0, 0, 0, 0);
+void render::renderScreen(const std::array<int, 256 * 256>& screen, int backdropColour) {
+	setPixelColour(backdropColour % 0x3F);
+	//SDL_SetRenderDrawColor(gRenderer, 0, 0, 0, 0xff);
 	SDL_RenderClear(gRenderer);
 
 	for (int i = 0; i < 61440; i++) {

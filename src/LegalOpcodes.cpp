@@ -964,71 +964,64 @@ void JSR(Byte opcode, Word address) {
 }
 
 void LDA(Byte opcode, Word address) {
+	if (address >= 0x2000 || address <= 0x2007) {
+		address = address;
+	}
 	Byte data = 0;
 
 	// Set data to correct data depending on address mode
 	switch (opcode) {
 	// Immediate, 2 bytes, 2 cycles
 	case 0xa9:
-		data = nes_cpu->immediatePeek(address);
+		data = nes_cpu->immediateDelayedPeek(address, ACCUMULATOR);
 		nes_cpu->setCycleCount(2);
 		nes_cpu->incrementPCBy(2);
 		break;
 	// Zero page, 2 bytes, 3 cycles
 	case 0xa5:
-		data = nes_cpu->zeroPagePeek(address);
+		data = nes_cpu->zeroPageDelayedPeek(address, ACCUMULATOR);
 		nes_cpu->setCycleCount(3);
 		nes_cpu->incrementPCBy(2);
 		break;
 	// Zero page,X , 2 bytes, 4 cycles
 	case 0xb5:
-		data = nes_cpu->zeroPageXPeek(address);
+		data = nes_cpu->zeroPageXDelayedPeek(address, ACCUMULATOR);
 		nes_cpu->setCycleCount(4);
 		nes_cpu->incrementPCBy(2);
 		break;
 	// Absolute, 3 bytes, 4 cycles
 	case 0xad:
-		data = nes_cpu->absolutePeek(address);
+		data = nes_cpu->absoluteDelayedPeek(address, ACCUMULATOR);
 		nes_cpu->setCycleCount(4);
 		nes_cpu->incrementPCBy(3);
 		break;
 	// Absolute,X , 3 bytes, 4 cycles (5 if page crossed)
 	case 0xbd:
-		data = nes_cpu->absoluteXPeek(address);
+		data = nes_cpu->absoluteXDelayedPeek(address, ACCUMULATOR);
 		nes_cpu->setCycleCount(4 + nes_cpu->wasPageBoundaryCrossedOnPeek());
 		nes_cpu->incrementPCBy(3);
 		break;
 	// Absolute,Y 3 bytes, 4 cycles (5 if page crossed)
 	case 0xb9:
-		data = nes_cpu->absoluteYPeek(address);
+		data = nes_cpu->absoluteYDelayedPeek(address, ACCUMULATOR);
 		nes_cpu->setCycleCount(4 + nes_cpu->wasPageBoundaryCrossedOnPeek());
 		nes_cpu->incrementPCBy(3);
 		break;
 	// Indirect,X , 2 bytes, 6 cycles
 	case 0xa1:
-		data = nes_cpu->indirectXPeek(address);
+		data = nes_cpu->indirectXDelayedPeek(address, ACCUMULATOR);
 		nes_cpu->setCycleCount(6);
 		nes_cpu->incrementPCBy(2);
 		break;
 	// Indirect, Y 2 bytes, 5 cycles (6 if page crossed)
 	case 0xb1:
-		data = nes_cpu->indirectYPeek(address);
+		data = nes_cpu->indirectYDelayedPeek(address, ACCUMULATOR);
 		nes_cpu->setCycleCount(5 + nes_cpu->wasPageBoundaryCrossedOnPeek());
 		nes_cpu->incrementPCBy(2);
 		break;
 	default:
 		break;
 	}
-
-	// Set zero flag to 0
-	nes_cpu->clearZero();
-	nes_cpu->clearNegative();
-
-	// If result is zero, set zero bit
-	if (data == 0) nes_cpu->setZero(); 
-	if (data & 128) nes_cpu->setNegative();
-
-	nes_cpu->setA(data);
 }
 
 void LDX(Byte opcode, Word address) {
@@ -1038,45 +1031,37 @@ void LDX(Byte opcode, Word address) {
 	switch (opcode) {
 	// Immediate, 2 bytes, 2 cycles
 	case 0xa2:
-		data = nes_cpu->immediatePeek(address);
+		data = nes_cpu->immediateDelayedPeek(address, X_REGISTER);
 		nes_cpu->setCycleCount(2);
 		nes_cpu->incrementPCBy(2);
 		break;
 	// Zero page, 2 bytes, 3 cycles
 	case 0xa6:
-		data = nes_cpu->zeroPagePeek(address);
+		data = nes_cpu->zeroPageDelayedPeek(address, X_REGISTER);
 		nes_cpu->setCycleCount(3);
 		nes_cpu->incrementPCBy(2);
 		break;
 	// Zero page,Y , 2 bytes, 4 cycles
 	case 0xb6:
-		data = nes_cpu->zeroPageYPeek(address);
+		data = nes_cpu->zeroPageYDelayedPeek(address, X_REGISTER);
 		nes_cpu->setCycleCount(4);
 		nes_cpu->incrementPCBy(2);
 		break;
 	// Absolute, 3 bytes, 4 cycles
 	case 0xaE:
-		data = nes_cpu->absolutePeek(address);
+		data = nes_cpu->absoluteDelayedPeek(address, X_REGISTER);
 		nes_cpu->setCycleCount(4);
 		nes_cpu->incrementPCBy(3);
 		break;
 	// Absolute,Y 3 bytes, 4 cycles (5 if page crossed)
 	case 0xbE:
-		data = nes_cpu->absoluteYPeek(address);
+		data = nes_cpu->absoluteYDelayedPeek(address, X_REGISTER);
 		nes_cpu->setCycleCount(4 + nes_cpu->wasPageBoundaryCrossedOnPeek());
 		nes_cpu->incrementPCBy(3);
 		break;
 	default:
 		break;
 	}
-
-	nes_cpu->clearZero();
-	nes_cpu->clearNegative();
-
-	if (data == 0) nes_cpu->setZero();
-	if (data & 128) nes_cpu->setNegative();
-
-	nes_cpu->setX(data);
 }
 
 void LDY(Byte opcode, Word address) {
@@ -1086,45 +1071,37 @@ void LDY(Byte opcode, Word address) {
 	switch (opcode) {
 	// Immediate, 2 bytes, 2 cycles
 	case 0xa0:
-		data = nes_cpu->immediatePeek(address);
+		data = nes_cpu->immediateDelayedPeek(address, Y_REGISTER);
 		nes_cpu->setCycleCount(2);
 		nes_cpu->incrementPCBy(2);
 		break;
 	// Zero page, 2 bytes, 3 cycles
 	case 0xa4:
-		data = nes_cpu->zeroPagePeek(address);
+		data = nes_cpu->zeroPageDelayedPeek(address, Y_REGISTER);
 		nes_cpu->setCycleCount(3);
 		nes_cpu->incrementPCBy(2);
 		break;
 	// Zero page,X , 2 bytes, 4 cycles
 	case 0xb4:
-		data = nes_cpu->zeroPageXPeek(address);
+		data = nes_cpu->zeroPageXDelayedPeek(address, Y_REGISTER);
 		nes_cpu->setCycleCount(4);
 		nes_cpu->incrementPCBy(2);
 		break;
 	// Absolute, 3 bytes, 4 cycles
 	case 0xac:
-		data = nes_cpu->absolutePeek(address);
+		data = nes_cpu->absoluteDelayedPeek(address, Y_REGISTER);
 		nes_cpu->setCycleCount(4);
 		nes_cpu->incrementPCBy(3);
 		break;
 	// Absolute,X , 3 bytes, 4 cycles (5 if page crossed)
 	case 0xbc:
-		data = nes_cpu->absoluteXPeek(address);
+		data = nes_cpu->absoluteXDelayedPeek(address, Y_REGISTER);
 		nes_cpu->setCycleCount(4 + nes_cpu->wasPageBoundaryCrossedOnPeek());
 		nes_cpu->incrementPCBy(3);
 		break;
 	default:
 		break;
 	}
-
-	nes_cpu->clearZero();
-	nes_cpu->clearNegative();
-
-	if (data == 0) nes_cpu->setZero();
-	if (data & 128) nes_cpu->setNegative();
-
-	nes_cpu->setY(data);
 }
 
 void LSR(Byte opcode, Word address) {
@@ -1617,43 +1594,43 @@ void STA(Byte opcode, Word address) {
 	switch (opcode) {
 	case 0x85:
 		// Zero page
-		nes_cpu->zeroPageSet(address, nes_cpu->getA());
+		nes_cpu->zeroPageDelayedWrite(address, nes_cpu->getA());
 		nes_cpu->setCycleCount(3);
 		nes_cpu->incrementPCBy(2);
 		break;
 	// Zero page,X
 	case 0x95:
-		nes_cpu->zeroPageXSet(address, nes_cpu->getA());
+		nes_cpu->zeroPageXDelayedWrite(address, nes_cpu->getA());
 		nes_cpu->setCycleCount(4);
 		nes_cpu->incrementPCBy(2);
 		break;
 	// Absolute
 	case 0x8d:
-		nes_cpu->absoluteSet(address, nes_cpu->getA());
+		nes_cpu->absoluteDelayedWrite(address, nes_cpu->getA());
 		nes_cpu->setCycleCount(4);
 		nes_cpu->incrementPCBy(3);
 		break;
 	// Absolute,X
 	case 0x9d:
-		nes_cpu->absoluteXSet(address, nes_cpu->getA());
+		nes_cpu->absoluteXDelayedWrite(address, nes_cpu->getA());
 		nes_cpu->setCycleCount(5);
 		nes_cpu->incrementPCBy(3);
 		break;
 	// Absolute,Y
 	case 0x99:
-		nes_cpu->absoluteYSet(address, nes_cpu->getA());
+		nes_cpu->absoluteYDelayedWrite(address, nes_cpu->getA());
 		nes_cpu->setCycleCount(5);
 		nes_cpu->incrementPCBy(3);
 		break;
 	// Indirect,X
 	case 0x81:
-		nes_cpu->indirectXSet(address, nes_cpu->getA());
+		nes_cpu->indirectXDelayedWrite(address, nes_cpu->getA());
 		nes_cpu->setCycleCount(6);
 		nes_cpu->incrementPCBy(2);
 		break;
 	// Indirect, Y
 	case 0x91:
-		nes_cpu->indirectYSet(address, nes_cpu->getA());
+		nes_cpu->indirectYDelayedWrite(address, nes_cpu->getA());
 		nes_cpu->setCycleCount(6);
 		nes_cpu->incrementPCBy(2);
 		break;
@@ -1667,19 +1644,19 @@ void STX(Byte opcode, Word address) {
 	switch (opcode) {
 	// Zero page, 2 bytes, 3 cycles
 	case 0x86:
-		nes_cpu->zeroPageSet(address, nes_cpu->getX());
+		nes_cpu->zeroPageDelayedWrite(address, nes_cpu->getX());
 		nes_cpu->setCycleCount(3);
 		nes_cpu->incrementPCBy(2);
 		break;
 	// Zero page,Y , 2 bytes, 4 cycles
 	case 0x96:
-		nes_cpu->zeroPageYSet(address, nes_cpu->getX());
+		nes_cpu->zeroPageYDelayedWrite(address, nes_cpu->getX());
 		nes_cpu->setCycleCount(4);
 		nes_cpu->incrementPCBy(2);
 		break;
 	// Absolute, 3 bytes, 4 cycles
 	case 0x8E:
-		nes_cpu->absoluteSet(address, nes_cpu->getX());
+		nes_cpu->absoluteDelayedWrite(address, nes_cpu->getX());
 		nes_cpu->setCycleCount(4);
 		nes_cpu->incrementPCBy(3);
 		break;
@@ -1694,19 +1671,19 @@ void STY(Byte opcode, Word address) {
 	switch (opcode) {
 	// Zero page, 2 bytes, 3 cycles
 	case 0x84:
-		nes_cpu->zeroPageSet(address, nes_cpu->getY());
+		nes_cpu->zeroPageDelayedWrite(address, nes_cpu->getY());
 		nes_cpu->setCycleCount(3);
 		nes_cpu->incrementPCBy(2);
 		break;
 	// Zero page,X , 2 bytes, 4 cycles
 	case 0x94:
-		nes_cpu->zeroPageXSet(address, nes_cpu->getY());
+		nes_cpu->zeroPageXDelayedWrite(address, nes_cpu->getY());
 		nes_cpu->setCycleCount(4);
 		nes_cpu->incrementPCBy(2);
 		break;
 	// Absolute, 3 bytes, 4 cycles
 	case 0x8C:
-		nes_cpu->absoluteSet(address, nes_cpu->getY());
+		nes_cpu->absoluteDelayedWrite(address, nes_cpu->getY());
 		nes_cpu->setCycleCount(4);
 		nes_cpu->incrementPCBy(3);
 		break;

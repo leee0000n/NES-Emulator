@@ -21,6 +21,9 @@ constexpr int NONSENSE_FLAG = 32;
 constexpr int OVRFLOW = 64;
 constexpr int NEGATIVE = 128;
 
+constexpr int ACCUMULATOR = 1;
+constexpr int X_REGISTER = 2;
+constexpr int Y_REGISTER = 3;
 /*
 7  bit  0
 ---- ----
@@ -70,7 +73,20 @@ private:
 	bool NMI;
 
 	std::array<Byte, 65536> memory;
+
+	bool isWriteDelayed;
+
+	/// <summary>
+	/// 0 = no delayed read, 1 = store value in accumulator
+	/// 2 = store value in x, 3 = store value in y
+	/// </summary>
+	int delayedReadRegister;
+	Word delayedAccessAddress;
+	Byte delayedWriteData;
 public:
+	// Used to exit main loop
+	bool finish;
+
 	NES_CPU();
 
 	/// <summary>
@@ -143,7 +159,6 @@ public:
 
 	Byte indirectYPeek(Word address);
 
-
 	void correctSet(Word address, Byte data);
 
 	void zeroPageSet(Word address, Byte data);
@@ -168,6 +183,62 @@ public:
 	/// <param name="address"> Address of memory to set data</param>
 	/// <param name="data"> 8 bit data to set</param>
 	void set(Word address, Byte data);
+
+	void delayedPeek(Word address, int reg);
+
+	/// <summary>
+	/// Get the operand of the opcode
+	/// </summary>
+	/// <param name="address"> Address of opcode </param>
+	/// <returns> Operand of the opcode</returns>
+	Byte immediateDelayedPeek(Word address, int reg);
+
+	/// <summary>
+	/// 
+	/// </summary>
+	/// <param name="address"></param>
+	/// <returns></returns>
+	Byte zeroPageDelayedPeek(Word address, int reg);
+
+	Byte zeroPageXDelayedPeek(Word address, int reg);
+
+	Byte zeroPageYDelayedPeek(Word address, int reg);
+
+	Byte absoluteDelayedPeek(Word address, int reg);
+
+	Byte absoluteXDelayedPeek(Word address, int reg);
+
+	Byte absoluteYDelayedPeek(Word address, int reg);
+
+	Byte indirectDelayedPeek(Word address, int reg);
+
+	Byte indirectXDelayedPeek(Word address, int reg);
+
+	Byte indirectYDelayedPeek(Word address, int reg);
+
+	/// <summary>
+	/// Delays write to the last cycle of an instructions execution
+	/// Used for cycle accuracy
+	/// </summary>
+	/// <param name="address">address to write to</param>
+	/// <param name="data">data to write</param>
+	void delayedWrite(Word address, Byte data);
+
+	void zeroPageDelayedWrite(Word address, Byte data);
+
+	void zeroPageXDelayedWrite(Word address, Byte data);
+
+	void zeroPageYDelayedWrite(Word address, Byte data);
+
+	void absoluteDelayedWrite(Word address, Byte data);
+
+	void absoluteXDelayedWrite(Word address, Byte data);
+
+	void absoluteYDelayedWrite(Word address, Byte data);
+
+	void indirectXDelayedWrite(Word address, Byte data);
+
+	void indirectYDelayedWrite(Word address, Byte data);
 
 	void setCycleCount(int cycleCount);
 	int getCycleCount() const;

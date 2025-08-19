@@ -3,6 +3,8 @@
 #include "NES_PPU.h"
 #include "Opcodes.h"
 
+#include "NES_CPUdebug.h"
+
 #include <iostream>
 #include <string>
 #include <fstream>
@@ -27,6 +29,9 @@ NES_CPU::NES_CPU() {
 	this->isPRG_ROMMirrored = false;
 	this->pageBoundaryCrossedOnPeek = false;
 	this->NMI = false;
+	this->finish = false;
+	this->isWriteDelayed = false;
+	this->delayedReadRegister = 0;
 	this->power_up();
 
 	opcodes::loadLegalOpcodes();
@@ -49,39 +54,68 @@ void NES_CPU::reset() {
 }
 
 void NES_CPU::run() {
-	int line = 1;
-	int targetLine = 2;
-	while (true) {
+	if (cycleCount <= 0) {
+
+		Byte opcode = correctPeek(PC);
+		Word address = PC;
+
+		// BREAK OPCODE
+		if (opcode == 0) {
+			finish = true;
+			return;
+		}
+
 		
+		NES_CPUdebug::logCPUState();
+		// Run instruction at PC
+		opcodes::opcodeFuncPointers[opcode](opcode, address);
+		pageBoundaryCrossedOnPeek = false;
 
-		if (cycleCount <= 0) {
+		totalCycleCount += cycleCount;
+		cycleCount--;
 
-			if (NMI) {
-				pushStack2Byte(PC);
-				pushStack1Byte(P);
-				P |= INTERRUPT_DISABLE;
+		if (NMI) {
+			pushStack2Byte(PC);
+			pushStack1Byte(P);
+			P |= INTERRUPT_DISABLE;
 
-				PC = nes_cpu->correctPeek(0xFFFA) + (nes_cpu->correctPeek(0xFFFB) << 8);
-				NMI = false;
+			PC = nes_cpu->correctPeek(0xFFFA) + (nes_cpu->correctPeek(0xFFFB) << 8);
+			NMI = false;
+		}
+	}
+	else if (cycleCount == 1) {
+		if (isWriteDelayed) {
+			correctSet(delayedAccessAddress, delayedWriteData);
+			isWriteDelayed = false;
+		}
+		else if (delayedReadRegister != 0) {
+			Byte data = correctPeek(delayedAccessAddress);
+			switch (delayedReadRegister) {
+			case ACCUMULATOR:
+				A = data;
+				break;
+			case X_REGISTER:
+				X = data;
+				break;
+			case Y_REGISTER:
+				Y = data;
+				break;
+			default:
+				break;
 			}
 
-			Byte opcode = correctPeek(PC);
-			Word address = PC;
+			nes_cpu->clearZero();
+			nes_cpu->clearNegative();
 
-			// BREAK OPCODE
-			if (opcode == 0) return;
+			if (data == 0) nes_cpu->setZero();
+			if (data & 128) nes_cpu->setNegative();
 
-			// Run instruction at PC
-			opcodes::opcodeFuncPointers[opcode](opcode, address);
-			line++;
-			pageBoundaryCrossedOnPeek = false;
-
-			cycleCount--;
+			delayedReadRegister = 0;
 		}
-		else cycleCount--;
+		cycleCount--;
 	}
+	else cycleCount--;
 }
-
 
 bool NES_CPU::setBytes(int start, std::vector<int> source) {
 	// Pre-conditions otherwise there is a possibility of index out of bounds error
@@ -123,8 +157,8 @@ bool NES_CPU::loadROM(std::string path) {
 
 		if (!isPRG_ROMMirrored) {
 			// Load second set of 16kb if rom not mirrored
-			for (int i = 0x4000; i < 0x10000; i++) {
-				nes_cpu->memory[0xC000 + i] = buffer[16 + i];
+			for (int i = 0x4000; i < 0x8000; i++) {
+				nes_cpu->memory[0x8000 + i] = buffer[16 + i];
 			}
 		}
 
@@ -271,20 +305,28 @@ void NES_CPU::correctSet(Word address, Byte data) {
 		switch (address) {
 		case 0x2000:
 			ppu->PPUCTRLwrite(data);
+			break;
 		case 0x2001:
 			ppu->PPUMASKwrite(data);
+			break;
 		case 0x2002:
 			ppu->CpuPpuLatchwrite(data);
+			break;
 		case 0x2003:
 			ppu->OAMADDRwrite(data);
+			break;
 		case 0x2004:
 			ppu->OAMDATAwrite(data);
+			break;
 		case 0x2005:
 			ppu->PPUSCROLLwrite(data);
+			break;
 		case 0x2006:
 			ppu->PPUADDRwrite(data);
+			break;
 		case 0x2007:
 			ppu->PPUDATAwrite(data);
+			break;
 		}
 
 		return;
@@ -345,6 +387,136 @@ void NES_CPU::indirectYSet(Word address, Byte data) {
 	address = correctPeek(address + 1);
 	address = Y + correctPeek(address) + (correctPeek((address + 1) % 256) << 8);
 	correctSet(address, data);
+}
+
+void NES_CPU::delayedPeek(Word address, int reg) {
+	delayedReadRegister = reg;
+	delayedAccessAddress = address;
+}
+
+Byte NES_CPU::immediateDelayedPeek(Word address, int reg) {
+	delayedPeek(address + 1, reg);
+	return correctPeek(address + 1);
+}
+
+Byte NES_CPU::zeroPageDelayedPeek(Word address, int reg) {
+	Word zeropageaddress = correctPeek(address + 1);
+	delayedPeek(zeropageaddress, reg);
+	return correctPeek(zeropageaddress);
+}
+
+Byte NES_CPU::zeroPageXDelayedPeek(Word address, int reg) {
+	Word zeropageXaddress = correctPeek(address + 1) + X;
+	delayedPeek(zeropageXaddress % 256, reg);
+	return correctPeek(zeropageXaddress % 256);
+}
+
+Byte NES_CPU::zeroPageYDelayedPeek(Word address, int reg) {
+	Word zeropageYaddress = correctPeek(address + 1) + Y;
+	delayedPeek(zeropageYaddress % 256, reg);
+	return correctPeek(zeropageYaddress % 256);
+}
+
+Byte NES_CPU::absoluteDelayedPeek(Word address, int reg) {
+	Word absoluteaddress = correctPeek(address + 1) + (correctPeek(address + 2) << 8);
+	delayedPeek(absoluteaddress, reg);
+	return correctPeek(absoluteaddress);
+}
+
+Byte NES_CPU::absoluteXDelayedPeek(Word address, int reg) {
+	Word absoluteaddress = correctPeek(address + 1) + (correctPeek(address + 2) << 8);
+	Word absoluteXaddress = absoluteaddress + X;
+
+	// Used for adding cycles when page boudnary crossed
+	if ((absoluteaddress & 0xFF00) != (absoluteXaddress & 0xFF00)) pageBoundaryCrossedOnPeek = true;
+
+	delayedPeek(absoluteXaddress, reg);
+	return correctPeek(absoluteXaddress);
+}
+
+Byte NES_CPU::absoluteYDelayedPeek(Word address, int reg) {
+	Word absoluteaddress = correctPeek(address + 1) + (correctPeek(address + 2) << 8);
+	Word absoluteYaddress = absoluteaddress + Y;
+
+	// Used for adding cycles when page boudnary crossed
+	if ((absoluteaddress & 0xFF00) != (absoluteYaddress & 0xFF00)) pageBoundaryCrossedOnPeek = true;
+
+	delayedPeek(absoluteYaddress, reg);
+	return correctPeek(absoluteYaddress);
+}
+
+Byte NES_CPU::indirectDelayedPeek(Word address, int reg) {
+	Word indirectXPeek = correctPeek(address + 1);
+	Word lookupaddress = correctPeek(indirectXPeek) + (correctPeek(indirectXPeek + 1) << 8);
+	delayedPeek(lookupaddress, reg);
+	return correctPeek(lookupaddress);
+}
+
+Byte NES_CPU::indirectXDelayedPeek(Word address, int reg) {
+	Word indirectXPeek = correctPeek(address + 1) + X;
+	Word lookupaddress = correctPeek(indirectXPeek % 256) + (correctPeek((indirectXPeek + 1) % 256) << 8);
+	delayedPeek(lookupaddress, reg);
+	return correctPeek(lookupaddress);
+}
+
+Byte NES_CPU::indirectYDelayedPeek(Word address, int reg) {
+	Word indirectPeek = correctPeek(address + 1);
+	indirectPeek = correctPeek(indirectPeek) + (correctPeek((indirectPeek + 1) % 256) << 8);
+	Word indirectYPeek = indirectPeek + Y;
+
+	// Used for adding cycles when page boudnary crossed
+	if ((indirectYPeek & 0xFF00) != (indirectPeek & 0xFF00)) pageBoundaryCrossedOnPeek = true;
+
+	delayedPeek(indirectYPeek, reg);
+	return correctPeek(indirectYPeek);
+}
+
+void NES_CPU::delayedWrite(Word address, Byte data) {
+	isWriteDelayed = true;
+	delayedAccessAddress = address;
+	delayedWriteData = data;
+}
+
+void NES_CPU::zeroPageDelayedWrite(Word address, Byte data) {
+	address = correctPeek(address + 1);
+	delayedWrite(address, data);
+}
+
+void NES_CPU::zeroPageXDelayedWrite(Word address, Byte data) {
+	address = correctPeek(address + 1) + X;
+	delayedWrite(address % 256, data);
+}
+
+void NES_CPU::zeroPageYDelayedWrite(Word address, Byte data) {
+	address = correctPeek(address + 1) + Y;
+	delayedWrite(address % 256, data);
+}
+
+void NES_CPU::absoluteDelayedWrite(Word address, Byte data) {
+	address = correctPeek(address + 1) + (correctPeek(address + 2) << 8);
+	delayedWrite(address, data);
+}
+
+void NES_CPU::absoluteXDelayedWrite(Word address, Byte data) {
+	address = X + correctPeek(address + 1) + (correctPeek(address + 2) << 8);
+	delayedWrite(address, data);
+}
+
+void NES_CPU::absoluteYDelayedWrite(Word address, Byte data) {
+	address = Y + correctPeek(address + 1) + (correctPeek(address + 2) << 8);
+	delayedWrite(address, data);
+}
+
+void NES_CPU::indirectXDelayedWrite(Word address, Byte data) {
+	address = correctPeek(address + 1) + X;
+	address = correctPeek(address % 256) + (correctPeek((address + 1) % 256) << 8);
+	delayedWrite(address, data);
+}
+
+void NES_CPU::indirectYDelayedWrite(Word address, Byte data) {
+	address = correctPeek(address + 1);
+	address = Y + correctPeek(address) + (correctPeek((address + 1) % 256) << 8);
+	delayedWrite(address, data);
 }
 
 Byte NES_CPU::getA() const {

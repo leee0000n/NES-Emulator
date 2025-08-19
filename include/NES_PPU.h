@@ -9,12 +9,13 @@ using Word = unsigned short;
 constexpr bool FIRST_WRITE = true;
 constexpr bool SECOND_WRITE = false;
 
-constexpr bool EVEN_FRAME = false;
-constexpr bool ODD_FRAME = true;
-
 constexpr int VBLANK = 0x80;
 
-constexpr int CHOSEN_PATTERN_TABLE = 0x08;
+constexpr int BACKGROUND_PATTERN_TABLE = 0x10;
+
+constexpr int COARSE_X_MASK = 0x001F;
+constexpr int COARSE_Y_MASK = 0x03E0;
+constexpr int FINE_Y_MASK = 0x7000;
 
 struct Tile {
 	std::array<Byte, 16> tile8x8;
@@ -91,13 +92,6 @@ class NES_PPU {
 	Byte OAMADDR;
 
 	/// <summary>
-	/// CPU can read or write
-	/// 1 byte of data
-	/// data read from or written to OAM address in OAMADDR register
-	/// </summary>
-	Byte OAMDATA;
-
-	/// <summary>
 	/// CPU can write only. writes twice
 	/// XXXX XXXX YYYY YYYY
 	/// X byte represents X scroll
@@ -115,13 +109,6 @@ class NES_PPU {
 	Word PPUADDR;
 
 	/// <summary>
-	/// CPU can read and write
-	/// 1 byte of data
-	/// data read from or written to ppu memory
-	/// </summary>
-	Byte PPUDATA;
-
-	/// <summary>
 	/// CPU can write only
 	/// High byte of address
 	/// DMA suspends CPU and copies entire page into OAM
@@ -131,6 +118,9 @@ class NES_PPU {
 	Word V;
 
 	Word T;
+
+	Byte X;
+
 	/// <summary>
 	/// When data is written to ppu registers, bus acts as an 8 bit latch.
 	/// Writes to read only registers still update this latch
@@ -151,9 +141,10 @@ class NES_PPU {
 	/// false = even
 	/// true = odd
 	/// </summary>
-	bool frameType;
+	bool isFrameOdd;
 
 	int scanlineNum;
+	int ppuDot;
 	int ppuCycle;
 
 
@@ -171,7 +162,16 @@ class NES_PPU {
 
 	std::array<Byte, 16384> VRAM;
 
-	std::array<int, 256 * 256> screen;
+	std::array<int, 65536> screen;
+
+	int currentPixel;
+	std::array<int, 24> pixelsToRender;
+	
+
+	Byte nextNametableByte;
+	Byte nextAttributeByte;
+	Byte nextTileLoByte;
+	Byte nextTileHiByte;
 
 public:
 
@@ -187,14 +187,19 @@ public:
 	/// </summary>
 	void run();
 
-	void addToScreen(Byte loByte, Byte hiByte, Byte attribyte, int paletteChoice);
+	void renderScanLines();
+	void preRenderScanlLine();
+	void vblankScanLines();
+
+	void fetchPixels();
 
 	void default2c02Palette();
 
 	bool loadCHRROM(std::string path);
 	bool loadPalFile(std::string path);
 
-	Byte correctPeek(Word address);
+	Byte correctPeek(Word address) const;
+	void correctSet(Word address, Byte data);
 
 	void CpuPpuLatchwrite(Byte data);
 	Byte CpuPpuLatchRead() const;
@@ -203,24 +208,28 @@ public:
 
 	void PPUMASKwrite(Byte data);
 
-	Byte PPUSTATUSread() const;
+	Byte PPUSTATUSread();
 
 	void OAMADDRwrite(Byte data);
 
 	void OAMDATAwrite(Byte data);
-	Byte OAMDATAread() const;
+	Byte OAMDATAread();
 
 	void PPUSCROLLwrite(Byte data);
 
 	void PPUADDRwrite(Byte data);
 
 	void PPUDATAwrite(Byte data);
-	Byte PPUDATAread() const;
+	Byte PPUDATAread();
 
 	void OAMDMAwrite(Byte data);
 
-	int getPPUCycle();
-	int getPPUScanline();
+	void incrementCoarseX();
+	void incrementCoarseY();
+
+
+	int getPPUCycle() const;
+	int getPPUScanline() const;
 
 	void drawPatternTables();
 	void drawTile(int tileIndex, int tableNum);
