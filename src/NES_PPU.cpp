@@ -81,7 +81,6 @@ void NES_PPU::run() {
 	// Skip cycle 0 if odd frame and on prerender line
 	if (scanlineNum == 261 && ppuDot == 0 && 
 		isFrameOdd && IS_BACKGROUND_RENDERING_ENABLED(PPUMASK)) ppuDot = 1;
-	
 
 	if (scanlineNum < 240) renderScanLines();
 	else if (scanlineNum == 261) preRenderScanlLine();
@@ -500,6 +499,7 @@ Byte NES_PPU::PPUDATAread() {
 	// Bit 2 of PPUCTRL determines how much to increment PPUADDR by after writes
 	if (PPUCTRL & 4) PPUADDR += 32;
 	else PPUADDR++;
+	PPUADDR %= 0x4000;
 
 	if (PPUADDR >= 0x3F00) return CpuPpuLatch;
 	return data;

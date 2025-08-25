@@ -66,12 +66,10 @@ void NES_CPU::run() {
 		}
 
 		
-		NES_CPUdebug::logCPUState();
 		// Run instruction at PC
 		opcodes::opcodeFuncPointers[opcode](opcode, address);
 		pageBoundaryCrossedOnPeek = false;
 
-		totalCycleCount += cycleCount;
 		cycleCount--;
 
 		if (NMI) {

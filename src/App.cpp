@@ -10,7 +10,7 @@ void App::run() {
 	nes_cpu = new NES_CPU();
 	ppu = new NES_PPU();
 
-	std::string rom = "C:/Users/leon_/source/repos/NES-Emulator/resource/pacman.nes"
+	std::string rom = "C:/Users/leon_/source/repos/NES-Emulator/resource/test_ppu_read_buffer.nes"
 ;
 	nes_cpu->loadROM(rom);
 	ppu->loadCHRROM(rom);
@@ -25,12 +25,17 @@ void App::run() {
 	bool running = false;
 	bool reset = false;
 	bool started = false;
+	int loop = 0;
 	// Run program
-	while (true) {
+	while (true && loop != 50000000) {
+		loop++;
 		for (int i = 0; i < 3; i++) {
 			ppu->run();
 		}
 
+		if (loop == 913195) {
+			loop = loop;
+		}
 		
 		nes_cpu->run();
 
