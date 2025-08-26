@@ -1,49 +1,12 @@
 // ReSharper disable All
 #pragma once
 
+#include "Constants.h"
+
 #include <array>
 #include <vector>
 #include <string>
 
-
-using Byte = unsigned char;
-using Word = unsigned short;
-
-constexpr bool HI_BYTE_ENABLED = true;
-constexpr bool HI_BYTE_DISABLED = false;
-
-constexpr int CARRY = 1;
-constexpr int ZERO = 2;
-constexpr int INTERRUPT_DISABLE = 4;
-constexpr int DECIMAL = 8;
-constexpr int BREAK = 16;
-constexpr int NONSENSE_FLAG = 32;
-constexpr int OVRFLOW = 64;
-constexpr int NEGATIVE = 128;
-
-constexpr int ACCUMULATOR = 1;
-constexpr int X_REGISTER = 2;
-constexpr int Y_REGISTER = 3;
-/*
-7  bit  0
----- ----
-NV1B DIZC
-|||| ||||
-|||| |||+- Carry
-|||| ||+-- Zero
-|||| |+--- Interrupt Disable
-|||| +---- Decimal
-|||+------ (No CPU effect; see: the B flag)
-||+------- (No CPU effect; always pushed as 1)
-|+-------- Overflow
-+--------- Negative
-*/
-
-/*
- * TODO:
- * Implement mirroring of RAM
- * Implement unmapped regions of memory returning last value read from memory
- */
 
 /// <summary>
 /// CPU for the nes
@@ -100,9 +63,9 @@ public:
 	void reset();
 
 	/// <summary>
-	/// Main loop for instruction doing  TODO: RENAME
+	/// Run cpu for 1 cycle
 	/// </summary>
-	void run();
+	void runCPUCycle();
 
 	/// <summary>
 	/// Set multiple, contigous bytes in memory to a specific sequence of bytes

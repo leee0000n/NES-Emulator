@@ -76,7 +76,7 @@ void NES_PPU::powerup() {
 	isFrameOdd = false;
 }
 
-void NES_PPU::run() {
+void NES_PPU::runPPUCycle() {
 
 	// Skip cycle 0 if odd frame and on prerender line
 	if (scanlineNum == 261 && ppuDot == 0 && 

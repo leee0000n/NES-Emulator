@@ -1,6 +1,7 @@
 
 #include "NES_CPU.h"
 #include "NES_PPU.h"
+#include "NES_APU.h"
 #include "Opcodes.h"
 
 #include "NES_CPUdebug.h"
@@ -53,17 +54,17 @@ void NES_CPU::reset() {
 	P |= 0x04;
 }
 
-void NES_CPU::run() {
+void NES_CPU::runCPUCycle() {
 	if (cycleCount <= 0) {
 
 		Byte opcode = correctPeek(PC);
 		Word address = PC;
 
-		// BREAK OPCODE
-		if (opcode == 0) {
-			finish = true;
-			return;
-		}
+		//// BREAK OPCODE
+		//if (opcode == 0) {
+		//	finish = true;
+		//	return;
+		//}
 
 		
 		// Run instruction at PC
@@ -204,6 +205,10 @@ Byte NES_CPU::correctPeek(Word address) {
 		}
 	}
 
+	if (isAddressInRangeInclusive(address, 0x4000, 0x4017)) {
+		return apu->readRegister(address);
+	}
+
 	// OAMDMA address
 	if (address == 0x4014) {
 		return ppu->CpuPpuLatchRead();
@@ -328,6 +333,10 @@ void NES_CPU::correctSet(Word address, Byte data) {
 		}
 
 		return;
+	}
+
+	if (isAddressInRangeInclusive(address, 0x4000, 0x4017)) {
+		apu->writeRegister(address, data);
 	}
 
 	// OAMDMA register

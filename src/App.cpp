@@ -1,19 +1,28 @@
 #include "App.h"
 #include "NES_CPU.h"
 #include "NES_PPU.h"
+#include "NES_APU.h"
 #include "NES_CPUdebug.h"
 #include "Render.h"
 
 #include <iostream>
 
+
+void init(std::string s) {
+	nes_cpu->loadROM(s);
+	ppu->loadCHRROM(s);
+}
+
 void App::run() {
 	nes_cpu = new NES_CPU();
 	ppu = new NES_PPU();
+	apu = new NES_APU();
 
-	std::string rom = "C:/Users/leon_/source/repos/NES-Emulator/resource/test_ppu_read_buffer.nes"
+	std::string game = "C:/Users/leon_/source/repos/leee0000n/NES-Emulator/resource/pacman.nes";
+	std::string test = "C:/Users/leon_/source/repos/leee0000n/NES-Emulator/resource/testnes/Branch_Basics.nes";
+
 ;
-	nes_cpu->loadROM(rom);
-	ppu->loadCHRROM(rom);
+	init(test);
 	ppu->loadPalFile("");
 
 	// Set program counter to start of instructions
@@ -27,20 +36,23 @@ void App::run() {
 	bool started = false;
 	int loop = 0;
 	// Run program
-	while (true && loop != 50000000) {
+	while (true) {
 		loop++;
 		for (int i = 0; i < 3; i++) {
-			ppu->run();
-		}
-
-		if (loop == 913195) {
-			loop = loop;
+			ppu->runPPUCycle();
 		}
 		
-		nes_cpu->run();
+		nes_cpu->runCPUCycle();
+		apu->runAPUCycle();
 
 		if (nes_cpu->finish) break;
 
+
+		if (loop == 10000000) {
+			for (int i = 0; i < 100; i++) std::cout << "\n";
+			NES_CPUdebug::printMemoryMirrored(0x60, 0x60);
+			loop = 0;
+		}
 
 		Byte testCode = nes_cpu->peek(0x6000);
 		if (testCode == 0x80) {

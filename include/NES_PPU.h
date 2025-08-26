@@ -1,63 +1,10 @@
 #pragma once
 
+#include "Constants.h"
+
 #include <array>
 #include <string>
 
-using Byte = unsigned char;
-using Word = unsigned short;
-
-constexpr bool FIRST_WRITE = true;
-constexpr bool SECOND_WRITE = false;
-
-constexpr int VBLANK = 0x80;
-
-constexpr int BACKGROUND_PATTERN_TABLE = 0x10;
-
-constexpr int COARSE_X_MASK = 0x001F;
-constexpr int COARSE_Y_MASK = 0x03E0;
-constexpr int FINE_Y_MASK = 0x7000;
-
-struct Tile {
-	std::array<Byte, 16> tile8x8;
-};
-
-/* PPUCTRL
-VPHB SINN
-|||| ||||
-|||| ||++- Base nametable address
-|||| ||    (0 = $2000; 1 = $2400; 2 = $2800; 3 = $2C00)
-|||| |+--- VRAM address increment per CPU read/write of PPUDATA
-|||| |     (0: add 1, going across; 1: add 32, going down)
-|||| +---- Sprite pattern table address for 8x8 sprites
-||||       (0: $0000; 1: $1000; ignored in 8x16 mode)
-|||+------ Background pattern table address (0: $0000; 1: $1000)
-||+------- Sprite size (0: 8x8 pixels; 1: 8x16 pixels  see PPU OAM#Byte 1)
-|+-------- PPU master/slave select
-|          (0: read backdrop from EXT pins; 1: output color on EXT pins)
-+--------- Vblank NMI enable (0: off, 1: on)
-*/
-
-/* PPUMASK
-BGRs bMmG
-|||| ||||
-|||| |||+- Greyscale (0: normal color, 1: greyscale)
-|||| ||+-- 1: Show background in leftmost 8 pixels of screen, 0: Hide
-|||| |+--- 1: Show sprites in leftmost 8 pixels of screen, 0: Hide
-|||| +---- 1: Enable background rendering
-|||+------ 1: Enable sprite rendering
-||+------- Emphasize red (green on PAL/Dendy)
-|+-------- Emphasize green (red on PAL/Dendy)
-+--------- Emphasize blue
-*/
-
-/* PPUSTATUS
-VSOx xxxx
-|||| ||||
-|||+-++++- (PPU open bus or 2C05 PPU identifier)
-||+------- Sprite overflow flag
-|+-------- Sprite 0 hit flag
-+--------- Vblank flag, cleared on read. Unreliable; see below.
-*/
 
 class NES_PPU {
 	/// <summary>
@@ -182,10 +129,9 @@ public:
 	void powerup();
 
 	/// <summary>
-	/// run 3 ppu cycles. called from NES_CPU::RUN every cpu
-	/// cycle
+	/// run one cycle of the PPU
 	/// </summary>
-	void run();
+	void runPPUCycle();
 
 	void renderScanLines();
 	void preRenderScanlLine();

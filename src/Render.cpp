@@ -1,6 +1,7 @@
 #include "Render.h"
 
 // todo implement cmake auto imports
+#include <fstream>
 #include <SDL.h>
 #include <stdio.h>
 
@@ -47,6 +48,8 @@ void render::renderScreen(const std::array<int, 256 * 256>& screen, int backdrop
 
 	SDL_RenderPresent(gRenderer);
 }
+
+SDL_AudioSpec spec;
 
 bool render::initSDL2() {
 	//Initialization flag
