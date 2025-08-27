@@ -28,7 +28,8 @@ constexpr bool SECOND_WRITE = false;
 
 constexpr int VBLANK = 0x80;
 
-constexpr int BACKGROUND_PATTERN_TABLE = 0x10;
+constexpr int BACKGROUND_RENDERING = 0x10;
+constexpr int SPRITE_RENDERING = 0x08;
 
 constexpr int COARSE_X_MASK = 0x001F;
 constexpr int COARSE_Y_MASK = 0x03E0;

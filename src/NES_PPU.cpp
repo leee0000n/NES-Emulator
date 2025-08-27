@@ -10,13 +10,12 @@
 #include "NES_CPU.h"
 #include "Render.h"
 
+#include "NES_PPUdebug.h"
+
 bool inline IS_RENDERING_ENABLED(Byte PPUMASK) {
 	return PPUMASK & 0x18;
 }
 
-bool inline IS_BACKGROUND_RENDERING_ENABLED(Byte PPUMASK) {
-	return PPUMASK & 0x08;
-}
 
 int inline EXTRACT_FINE_Y(Word V) {
 	return (V & 0x7000) >> 12;
@@ -46,6 +45,9 @@ NES_PPU::NES_PPU() {
 	this->T = 0;
 	this->pixelsToRender.fill(-1);
 	this->currentPixel = 0;
+	this->renderingEnabled = false;
+	this->ppuCycle = 0;
+	this->frameCount = 0;
 
 	reset();
 	powerup();
@@ -78,9 +80,17 @@ void NES_PPU::powerup() {
 
 void NES_PPU::runPPUCycle() {
 
+	if (scanlineNum == 261 && ppuDot == 339 && IS_RENDERING_ENABLED(PPUMASK)) {
+		renderingEnabled = true;
+	}
+
 	// Skip cycle 0 if odd frame and on prerender line
-	if (scanlineNum == 261 && ppuDot == 0 && 
-		isFrameOdd && IS_BACKGROUND_RENDERING_ENABLED(PPUMASK)) ppuDot = 1;
+	if (scanlineNum == 261 && ppuDot == 340 && renderingEnabled && isFrameOdd) {
+		NES_PPUdebug::logPPUDotSkip();
+		scanlineNum = 0;
+		ppuDot = 0;
+		isFrameOdd = !isFrameOdd;
+	}
 
 	if (scanlineNum < 240) renderScanLines();
 	else if (scanlineNum == 261) preRenderScanlLine();
@@ -98,10 +108,10 @@ void NES_PPU::runPPUCycle() {
 	if (scanlineNum > 261) {
 		scanlineNum = 0;
 		isFrameOdd = !isFrameOdd;
+		frameCount++;
 	}
 
 	ppuCycle++;
-	if (ppuCycle == 300000000) ppuCycle = 0;
 }
 
 void NES_PPU::renderScanLines() {
@@ -130,6 +140,7 @@ void NES_PPU::preRenderScanlLine() {
 	if (ppuDot == 1) {
 		// Clear vblank, sprite 0 hit and sprite overflow
 		PPUSTATUS &= ~0xE0;
+		nes_cpu->clearNMI();
 	}
 	else if (ppuDot < 256 && ppuDot > 0) {
 		incrementCoarseX();
@@ -153,12 +164,17 @@ void NES_PPU::preRenderScanlLine() {
 	}
 }
 
-
 void NES_PPU::vblankScanLines() {
 	if (scanlineNum == 240 && ppuDot == 0) render::renderScreen(screen, correctPeek(0x3f00));
 
 	// Set VBLANK
 	else if (scanlineNum == 241 && ppuDot == 1) {
+		// If PPUSTATUS was read one cycle before, do not set VBLANK flag
+		/*if (PPUSTATUS_read) {
+			PPUSTATUS_read = false;
+			return;
+		}*/
+
 		PPUSTATUS |= VBLANK;
 
 		if (PPUCTRL & 0x80) {
@@ -174,7 +190,7 @@ void NES_PPU::fetchPixels() {
 
 	// Get both planes of all pixels in one row of tile
 	int tileOffset = nametableByte * 16;
-	int pageOffset = (PPUCTRL & BACKGROUND_PATTERN_TABLE) * 0x1000;
+	int pageOffset = (PPUCTRL & BACKGROUND_RENDERING) * 0x1000;
 	Word patternTableAddress = tileOffset + pageOffset + EXTRACT_FINE_Y(V);
 	Byte loByte = correctPeek(patternTableAddress);
 	Byte hiByte = correctPeek(patternTableAddress + 8);
@@ -399,9 +415,10 @@ Byte NES_PPU::CpuPpuLatchRead()  const {
 }
 
 void NES_PPU::PPUCTRLwrite(Byte data) {
-	if (data & 0x80 && !(PPUCTRL & 0x80) && PPUSTATUS & 0X80) {
+	if (data & 0x80 && !(PPUCTRL & 0x80)) {
 		nes_cpu->setNMI();
 	}
+
 
 	PPUCTRL = data;
 	CpuPpuLatch = data;
@@ -411,6 +428,15 @@ void NES_PPU::PPUCTRLwrite(Byte data) {
 }
 
 void NES_PPU::PPUMASKwrite(Byte data) {
+	if (IS_RENDERING_ENABLED(data)) {
+		renderingEnabled = true;
+		NES_PPUdebug::logPPURenderingToggled(true);
+	}
+	else {
+		renderingEnabled = false;
+		NES_PPUdebug::logPPURenderingToggled(false);
+	}
+
 	PPUMASK = data;
 	CpuPpuLatch = data;
 }
@@ -421,6 +447,12 @@ Byte NES_PPU::PPUSTATUSread() {
 
 	// Clear vblank flag
 	PPUSTATUS &= 0x7F;
+
+	PPUSTATUS_read = true;
+
+	
+	nes_cpu->clearNMI();
+	
 
 	return data;
 }
@@ -510,12 +542,20 @@ void NES_PPU::OAMDMAwrite(Byte data) {
 	CpuPpuLatch = data;
 }
 
-int NES_PPU::getPPUCycle() const {
+long NES_PPU::getPPUCycle() const {
 	return ppuCycle;
 }
 
 int NES_PPU::getPPUScanline() const {
 	return scanlineNum;
+}
+
+int NES_PPU::getPPUDot() const {
+	return ppuDot;
+}
+
+int NES_PPU::getFrameCount() const {
+	return frameCount;
 }
 
 void NES_PPU::incrementCoarseX() {
@@ -603,7 +643,16 @@ void NES_PPU::drawTile(int tileIndex, int tableNum) {
 	}
 }
 
-
+Byte NES_PPU::getPPUCTRL() const { return PPUCTRL; }
+Byte NES_PPU::getPPUMASK() const { return PPUMASK; }
+Byte NES_PPU::getPPUSTATUS() const { return PPUSTATUS; }
+Word NES_PPU::getPPUADDR() const { return PPUADDR; }
+Word NES_PPU::getPPUSCROLL() const { return PPUSCROLL; }
+Word NES_PPU::getV() const { return V; }
+Word NES_PPU::getT() const { return T; }
+Byte NES_PPU::getX() const { return X; }
+bool NES_PPU::getWriteLatch() const { return writeLatch; }
+bool NES_PPU::getIsFrameOdd() const { return isFrameOdd; }
 
 
 

@@ -651,3 +651,6 @@ void NES_CPU::setNMI() {
 	NMI = true;
 }
 
+void NES_CPU::clearNMI() {
+	NMI = false;
+}

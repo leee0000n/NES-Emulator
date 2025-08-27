@@ -114,16 +114,6 @@ void NES_CPUdebug::printMemoryMirrored(int start, int end) {
 	}
 }
 
-void NES_CPUdebug::printRegisters() {
-	std::cout << "A:" << charToHex(nes_cpu->getA()) << " ";
-	std::cout << "X:" << charToHex(nes_cpu->getX()) << " ";
-	std::cout << "Y:" << charToHex(nes_cpu->getY()) << " ";
-	std::cout << "P:" << charToHex(nes_cpu->getP()) << " ";
-	std::cout << "SP:" << charToHex(nes_cpu->getS()) << " ";
-	// IGNORE PPU FOR NOW
-	std::cout << "CYC:" << nes_cpu->getTotalCycleCount() << "\n";
-}
-
 void NES_CPUdebug::logCPUState() {
 	std::string cpuLog = "";
 	//cpuLog += "opcode: " + charToHex(nes_cpu->correctPeek(nes_cpu->getPC())) + " ";

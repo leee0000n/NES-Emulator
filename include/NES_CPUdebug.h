@@ -23,11 +23,6 @@ public:
 	static void printMemoryMirrored(int start, int end);
 
 	/// <summary>
-	/// Print all register values
-	/// </summary>
-	static void printRegisters();
-
-	/// <summary>
 	/// Logs the state of the CPU register's in a private string attriute
 	/// </summary>
 	static void logCPUState();

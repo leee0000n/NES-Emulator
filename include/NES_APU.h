@@ -25,7 +25,10 @@ private:
 public:
     NES_APU();
 
-    // Write to APU register (0x4000 - 0x4017)
+	void powerUp();
+    
+	void reset();
+
     void writeRegister(Word address, Byte data);
 
     // Read from APU register (0x4000 - 0x4017)
@@ -36,9 +39,6 @@ public:
 
     // Step the frame sequencer
     void stepFrameSequencer();
-
-    // Reset the APU
-    void reset();
 };
 
-NES_APU* apu;
+extern NES_APU* apu;

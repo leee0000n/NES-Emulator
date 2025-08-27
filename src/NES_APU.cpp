@@ -3,6 +3,8 @@
 #include <SDL_audio.h>
 #include <random>
 
+NES_APU* apu = nullptr;
+
 struct AudioData {
     float phase;
     float phaseIncrement;
@@ -39,12 +41,25 @@ void NES_APU::clockSweepUnits() {
 
 // Write to APU register (0x4000 - 0x4017)
 void NES_APU::writeRegister(Word address, Byte data) {
-	registers[address] = data;
+    if (address == 0x4015 && (data & 0x80) == 0) {
+        // Writing to APU status register with bit 7 clear stops all channels
+        // Clear length counters for all channels
+        for (int i = 0; i < 4; i++) { // Assuming 4 channels: 2 pulse, triangle, noise
+            registers[0x15] &= ~(1 << i); // Clear enable bits
+            // Additional logic to reset length counters would go here
+        }
+	}
+	registers[address - 0x4000] = data;
 }
 
 // Read from APU register (0x4000 - 0x4017)
 Byte NES_APU::readRegister(Word address) {
-	if (address == 0x4015) return registers[address];
+	address -= 0x4000;
+    if (address == 0x4015) {
+		Byte status = registers[0x15];
+		registers[0x15] &= 0xBF; // Clear frame IRQ flag (bit 7)
+        return status;
+    }
 	return rand(); // Return random data for other registers
 
 }

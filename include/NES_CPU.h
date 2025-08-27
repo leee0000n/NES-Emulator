@@ -270,6 +270,7 @@ public:
 	bool wasPageBoundaryCrossedOnPeek() const;
 
 	void setNMI();
+	void clearNMI();
 };
 
 extern NES_CPU* nes_cpu;

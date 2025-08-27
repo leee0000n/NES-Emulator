@@ -90,9 +90,10 @@ class NES_PPU {
 	/// </summary>
 	bool isFrameOdd;
 
+	int frameCount;
 	int scanlineNum;
 	int ppuDot;
-	int ppuCycle;
+	long ppuCycle;
 
 
 	/// <summary>
@@ -119,6 +120,20 @@ class NES_PPU {
 	Byte nextAttributeByte;
 	Byte nextTileLoByte;
 	Byte nextTileHiByte;
+
+	/// <summary>
+	/// Indicates whether background rendering is enabled.
+	/// Used instead of PPUCTRL & BACKGROUND_PATTERN_TABLE
+	/// to avoid skipping dot if bg rendering is enabled mid-frame
+	/// </summary>
+	bool renderingEnabled;
+
+	/// <summary>
+	/// Indicates if PPUSTATUS has been read
+	/// Used for edge cases where PPUSTATUS is read
+	/// a few cycles within VBL flag being set
+	/// </summary>
+	bool PPUSTATUS_read;
 
 public:
 
@@ -173,9 +188,26 @@ public:
 	void incrementCoarseX();
 	void incrementCoarseY();
 
+	/*
+	* DEBUGGING FUNCTIONS
+	*/
 
-	int getPPUCycle() const;
+	long getPPUCycle() const;
 	int getPPUScanline() const;
+	int getPPUDot() const;
+	int getFrameCount() const;
+
+	Byte getPPUCTRL() const;
+	Byte getPPUMASK() const;
+	Byte getPPUSTATUS() const;
+	Word getPPUADDR() const;
+	Word getPPUSCROLL() const;
+	Word getV() const;
+	Word getT() const;
+	Byte getX() const;
+	bool getWriteLatch() const;
+	bool getIsFrameOdd() const;
+
 
 	void drawPatternTables();
 	void drawTile(int tileIndex, int tableNum);

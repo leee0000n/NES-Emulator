@@ -3,6 +3,7 @@
 #include "NES_PPU.h"
 #include "NES_APU.h"
 #include "NES_CPUdebug.h"
+#include "NES_PPUdebug.h"
 #include "Render.h"
 
 #include <iostream>
@@ -19,7 +20,7 @@ void App::run() {
 	apu = new NES_APU();
 
 	std::string game = "C:/Users/leon_/source/repos/leee0000n/NES-Emulator/resource/pacman.nes";
-	std::string test = "C:/Users/leon_/source/repos/leee0000n/NES-Emulator/resource/testnes/Branch_Basics.nes";
+	std::string test = "C:/Users/leon_/source/repos/leee0000n/NES-Emulator/resource/testnes/10even_odd_timing.nes";
 
 ;
 	init(test);
@@ -82,4 +83,6 @@ void App::run() {
 	NES_CPUdebug::printMemoryMirrored(0x60, 0x60);
 
 	NES_CPUdebug::addCPUTraceToFile("C:/Users/leon_/source/repos/NES-Emulator/resource/cpuTrace.txt");
+
+	NES_PPUdebug::writePPUTrace("C:/Users/leon_/source/repos/NES-Emulator/resource/ppuTrace.txt");
 }
