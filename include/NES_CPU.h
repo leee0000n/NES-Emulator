@@ -46,6 +46,9 @@ private:
 	int delayedReadRegister;
 	Word delayedAccessAddress;
 	Byte delayedWriteData;
+
+
+	
 public:
 	// Used to exit main loop
 	bool finish;

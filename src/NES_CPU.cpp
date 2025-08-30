@@ -33,6 +33,7 @@ NES_CPU::NES_CPU() {
 	this->finish = false;
 	this->isWriteDelayed = false;
 	this->delayedReadRegister = 0;
+
 	this->power_up();
 
 	opcodes::loadLegalOpcodes();
@@ -61,16 +62,14 @@ void NES_CPU::runCPUCycle() {
 		Word address = PC;
 
 		//// BREAK OPCODE
-		//if (opcode == 0) {
-		//	finish = true;
-		//	return;
-		//}
+		/*if (opcode == 0) {
+			finish = true;
+			return;
+		}*/
 
-		
-		// Run instruction at PC
 		opcodes::opcodeFuncPointers[opcode](opcode, address);
 		pageBoundaryCrossedOnPeek = false;
-
+		totalCycleCount += cycleCount;
 		cycleCount--;
 
 		if (NMI) {

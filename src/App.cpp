@@ -19,11 +19,11 @@ void App::run() {
 	ppu = new NES_PPU();
 	apu = new NES_APU();
 
-	std::string game = "C:/Users/leon_/source/repos/leee0000n/NES-Emulator/resource/pacman.nes";
-	std::string test = "C:/Users/leon_/source/repos/leee0000n/NES-Emulator/resource/testnes/10even_odd_timing.nes";
+	std::string game = "resources/pacman.nes";
+	std::string test = "resources/testnes/2vbl_set_time.nes";
 
 ;
-	init(test);
+	init(game);
 	ppu->loadPalFile("");
 
 	// Set program counter to start of instructions
@@ -35,10 +35,13 @@ void App::run() {
 	bool running = false;
 	bool reset = false;
 	bool started = false;
-	int loop = 0;
 	// Run program
+
+	NES_PPUdebug::addPPUTraceHeader();
+
+
 	while (true) {
-		loop++;
+		
 		for (int i = 0; i < 3; i++) {
 			ppu->runPPUCycle();
 		}
@@ -46,14 +49,8 @@ void App::run() {
 		nes_cpu->runCPUCycle();
 		apu->runAPUCycle();
 
+
 		if (nes_cpu->finish) break;
-
-
-		if (loop == 10000000) {
-			for (int i = 0; i < 100; i++) std::cout << "\n";
-			NES_CPUdebug::printMemoryMirrored(0x60, 0x60);
-			loop = 0;
-		}
 
 		Byte testCode = nes_cpu->peek(0x6000);
 		if (testCode == 0x80) {
@@ -82,7 +79,8 @@ void App::run() {
 	// print pages
 	NES_CPUdebug::printMemoryMirrored(0x60, 0x60);
 
-	NES_CPUdebug::addCPUTraceToFile("C:/Users/leon_/source/repos/NES-Emulator/resource/cpuTrace.txt");
+	NES_CPUdebug::addCPUTraceToFile("C:/Users/leon_/source/repos/leee0000n/NES-Emulator/resource/cpuTrace.txt");
 
-	NES_PPUdebug::writePPUTrace("C:/Users/leon_/source/repos/NES-Emulator/resource/ppuTrace.txt");
+	
+	NES_PPUdebug::writePPUTrace("C:/Users/leon_/source/repos/leee0000n/NES-Emulator/resource/ppuTrace.txt");
 }

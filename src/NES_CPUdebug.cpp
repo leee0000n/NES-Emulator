@@ -1,6 +1,8 @@
 #include "NES_CPUdebug.h"
 #include "NES_CPU.h"
 
+#include "NES_PPU.h"
+
 #include <string>
 #include <iostream>
 #include <fstream>
@@ -114,15 +116,38 @@ void NES_CPUdebug::printMemoryMirrored(int start, int end) {
 	}
 }
 
+std::string ppuGet() {
+	int dot = ppu->getPPUDot() - 3;
+	int frame = ppu->getPPUScanline();
+	if (dot < 0) {
+		dot = (ppu->getIsFrameOdd() ? 340 : 339) + dot + 2;
+		frame--;
+	}
+	
+	std::string rtn = "PPU:";
+
+	if (frame < 10) rtn += "  " + std::to_string(frame);
+	else if (frame < 100) rtn += " " + std::to_string(frame);
+	else rtn += std::to_string(frame);
+
+	rtn += ",";
+
+	if (dot < 10) rtn += "  " + std::to_string(dot);
+	else if (dot < 100) rtn += " " + std::to_string(dot);
+	else rtn += std::to_string(dot);
+
+	return rtn + " ";
+}
+
 void NES_CPUdebug::logCPUState() {
 	std::string cpuLog = "";
-	//cpuLog += "opcode: " + charToHex(nes_cpu->correctPeek(nes_cpu->getPC())) + " ";
+
 	cpuLog += "A:" + charToHex(nes_cpu->getA()) + " ";
 	cpuLog += "X:" + charToHex(nes_cpu->getX()) + " ";
 	cpuLog += "Y:" + charToHex(nes_cpu->getY()) + " ";
 	cpuLog += "P:" + charToHex(nes_cpu->getP()) + " ";
 	cpuLog += "SP:" + charToHex(nes_cpu->getS()) + " ";
-	// TODO: add ppu scanlines
+	cpuLog += ppuGet();
 	cpuLog += "CYC:" + std::to_string(nes_cpu->getTotalCycleCount()) + "\n";
 
 	cpuTrace += cpuLog;

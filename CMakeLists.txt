@@ -11,18 +11,24 @@ endif()
 
 project ("NES_Emulator")
 
+include(FetchContent)
+
+# ------------------------------
+# SDL2 Download
+# ------------------------------
+FetchContent_Declare(
+    SDL2
+    GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
+    GIT_TAG release-2.30.8   # pick a stable release
+)
+
+FetchContent_MakeAvailable(SDL2)
+
 set( SOURCE_PATH "${PROJECT_SOURCE_DIR}/src" )
 set( INCLUDE_PATH "${PROJECT_SOURCE_DIR}/include" )
 
-# Path to your SDL2 install
-set(SDL2_DIR "C:/dev/SDL2")                # Change this!
-set(SDL2_INCLUDE_DIR "${SDL2_DIR}/include")
-set(SDL2_LIBRARY_DIR "${SDL2_DIR}/lib/x64")    
-
 file( GLOB_RECURSE INCLUDES "${INCLUDE_PATH}/*.h" )
 file( GLOB_RECURSE CPPS "${SOURCE_PATH}/*.cpp" )
-
-file( GLOB ASSETS "${PROJECT_SOURCE_DIR}/resource/*.*")
 
 # Add source to this project's executable.
 add_executable (${PROJECT_NAME} ${CPPS} ${INCLUDES})
@@ -39,3 +45,27 @@ target_link_directories(${PROJECT_NAME} PRIVATE ${SDL2_LIBRARY_DIR})
 
 # Link the SDL2 library
 target_link_libraries(${PROJECT_NAME} PRIVATE SDL2)
+
+# ------------------------------
+# Link SDL2
+# ------------------------------
+target_link_libraries(${PROJECT_NAME} PRIVATE
+    SDL2::SDL2        # Core SDL2
+    SDL2::SDL2main    # Windows entry point
+)
+
+# ------------------------------
+# Copy DLLs to output directory
+# ------------------------------
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_FILE:SDL2>
+        $<TARGET_FILE_DIR:${PROJECT_NAME}>)
+
+# ------------------------------
+# Copy resources to output directory
+# ------------------------------
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${PROJECT_SOURCE_DIR}/resources"
+        $<TARGET_FILE_DIR:${PROJECT_NAME}>/resources)

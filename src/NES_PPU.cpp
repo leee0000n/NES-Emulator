@@ -36,7 +36,7 @@ static bool isAddressInRangeInclusive(Word address, Word addressLowerBound, Word
 }
 
 NES_PPU::NES_PPU() {
-	this->scanlineNum = 261;
+	this->scanlineNum = 0;
 	this->ppuDot = 0;
 	this->CpuPpuLatch = 0x00;
 	this->screen.fill(-1);
@@ -47,9 +47,9 @@ NES_PPU::NES_PPU() {
 	this->currentPixel = 0;
 	this->renderingEnabled = false;
 	this->ppuCycle = 0;
+
 	this->frameCount = 0;
 
-	reset();
 	powerup();
 }
 
@@ -80,16 +80,12 @@ void NES_PPU::powerup() {
 
 void NES_PPU::runPPUCycle() {
 
-	if (scanlineNum == 261 && ppuDot == 339 && IS_RENDERING_ENABLED(PPUMASK)) {
-		renderingEnabled = true;
-	}
-
 	// Skip cycle 0 if odd frame and on prerender line
-	if (scanlineNum == 261 && ppuDot == 340 && renderingEnabled && isFrameOdd) {
-		NES_PPUdebug::logPPUDotSkip();
+	if (scanlineNum == 261 && ppuDot == 340 && IS_RENDERING_ENABLED(PPUMASK) && isFrameOdd) {
 		scanlineNum = 0;
 		ppuDot = 0;
 		isFrameOdd = !isFrameOdd;
+		frameCount++;
 	}
 
 	if (scanlineNum < 240) renderScanLines();
@@ -176,6 +172,7 @@ void NES_PPU::vblankScanLines() {
 		}*/
 
 		PPUSTATUS |= VBLANK;
+		NES_PPUdebug::logVBLANKSet();
 
 		if (PPUCTRL & 0x80) {
 			nes_cpu->setNMI();
@@ -428,14 +425,6 @@ void NES_PPU::PPUCTRLwrite(Byte data) {
 }
 
 void NES_PPU::PPUMASKwrite(Byte data) {
-	if (IS_RENDERING_ENABLED(data)) {
-		renderingEnabled = true;
-		NES_PPUdebug::logPPURenderingToggled(true);
-	}
-	else {
-		renderingEnabled = false;
-		NES_PPUdebug::logPPURenderingToggled(false);
-	}
 
 	PPUMASK = data;
 	CpuPpuLatch = data;
@@ -445,8 +434,14 @@ Byte NES_PPU::PPUSTATUSread() {
 	writeLatch = FIRST_WRITE;
 	Byte data = PPUSTATUS;
 
+	if (ppuDot == 1 && scanlineNum == 241) {
+		data &= 0x7F;
+		nes_cpu->clearNMI();
+	}
+
 	// Clear vblank flag
 	PPUSTATUS &= 0x7F;
+	NES_PPUdebug::logVBLANKClear();
 
 	PPUSTATUS_read = true;
 
