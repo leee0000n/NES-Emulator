@@ -33,7 +33,7 @@ This has only been tested on **Windows 10 and 11** with the **MSVC compiler**. A
 
 In Visual Studio, when the project is cloned and first opened, it should set itself up automatically. 
 It can also be set up by using the following commands, which are not IDE-dependent.
-``` sh
+``` bash
 cd <CMakeLists.txt dir goes here>
 
 cmake ..
