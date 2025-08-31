@@ -42,6 +42,8 @@ cmake --build
 myproject.exe
 ```
 
+If you can't build the project via CMake, you may have to set it up manually. To do this, you must download the SDL2 library and tell your IDE of choice where it can find all the includes necessary (for SDL2 and for the headers in the include director of this project).
+
 ## How To Use
 Currently, it is very barebones and contains no features common in emulators. The emulator only works with iNES ROMs. To change what ROM is being used, navigate to ```App.cpp``` and pass the path to the ROM as an argument to the init function. For example
 ``` cpp
