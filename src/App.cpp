@@ -19,11 +19,11 @@ void App::run() {
 	ppu = new NES_PPU();
 	apu = new NES_APU();
 
-	std::string game = "resources/pacman.nes";
+	std::string game = "resources/dk.nes";
 	std::string test = "resources/testnes/2vbl_set_time.nes";
 
 ;
-	init(game);
+	init(test);
 	ppu->loadPalFile("");
 
 	// Set program counter to start of instructions

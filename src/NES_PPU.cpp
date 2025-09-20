@@ -412,10 +412,11 @@ Byte NES_PPU::CpuPpuLatchRead()  const {
 }
 
 void NES_PPU::PPUCTRLwrite(Byte data) {
-	if (data & 0x80 && !(PPUCTRL & 0x80)) {
+
+	// Rising edge of NMI enable bit triggers NMI if VBLANK is set
+	if (data & 0x80 && !(PPUCTRL & 0x80) && PPUSTATUS & 0x80) {
 		nes_cpu->setNMI();
 	}
-
 
 	PPUCTRL = data;
 	CpuPpuLatch = data;
@@ -434,19 +435,17 @@ Byte NES_PPU::PPUSTATUSread() {
 	writeLatch = FIRST_WRITE;
 	Byte data = PPUSTATUS;
 
-	if (ppuDot == 1 && scanlineNum == 241) {
+	/*if (ppuDot == 1 && scanlineNum == 241) {
 		data &= 0x7F;
 		nes_cpu->clearNMI();
-	}
+	}*/
 
 	// Clear vblank flag
 	PPUSTATUS &= 0x7F;
-	NES_PPUdebug::logVBLANKClear();
+	NES_PPUdebug::logVBLANKClear(); // TODO remove debug
 
 	PPUSTATUS_read = true;
 
-	
-	nes_cpu->clearNMI();
 	
 
 	return data;
